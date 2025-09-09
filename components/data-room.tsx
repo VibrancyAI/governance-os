@@ -182,8 +182,8 @@ export function DataRoom() {
               </div>
             </div>
 
-            <ul className="p-2 space-y-2">
-              {allDocs.map((doc) => (
+            <ul className="p-2 space-y-1">
+              {allDocs.map((doc, idx) => (
                 <DataRoomItem
                   key={doc}
                   label={doc}
@@ -285,76 +285,137 @@ function DataRoomItem({
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   return (
     <li
       className={cx(
-        "flex items-center justify-between text-sm px-2 py-1.5 rounded-lg",
+        "flex items-center justify-between py-3 px-3 rounded-lg transition-colors",
         hidden
-          ? "bg-zinc-50 border border-zinc-200 opacity-60"
+          ? "bg-zinc-50/50 border border-zinc-200/60 opacity-60"
           : isUploaded
-          ? "bg-green-50 border border-green-200"
-          : "bg-red-50 border border-red-200",
+          ? "bg-gradient-to-r from-green-50/80 to-emerald-50/80 border border-green-200/60"
+          : "bg-white border border-zinc-200/60",
       )}
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <span
+      {/* Simple status indicator */}
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div
           className={cx(
-            "inline-flex items-center justify-center size-5 rounded-full",
-            hidden ? "text-zinc-500" : isUploaded ? "text-green-600" : "text-red-600",
+            "w-2 h-2 rounded-full flex-shrink-0",
+            hidden 
+              ? "bg-zinc-400" 
+              : isUploaded 
+                ? "bg-green-500"
+                : "bg-amber-500"
           )}
-        >
-          {hidden ? "•" : isUploaded ? <CheckIcon /> : "!"}
-        </span>
-        <div className="min-w-0">
-          <div className={cx("truncate", isUploaded ? "text-zinc-700" : "text-zinc-700")}>{label}</div>
+        />
+        
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={cx(
+              "text-sm font-medium truncate",
+              hidden ? "text-zinc-500" : "text-zinc-700"
+            )}>
+              {label}
+            </span>
+            {isCustom && (
+              <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-600 flex-shrink-0">
+                Custom
+              </span>
+            )}
+          </div>
+          
           {isUploaded && attachedName ? (
-            <div className="text-xs text-zinc-500 truncate">{attachedName}</div>
-          ) : (
-            <div className="text-[10px] uppercase tracking-wide text-zinc-600">Required</div>
+            <div className="text-xs text-zinc-500 truncate mt-0.5">
+              {attachedName}
+            </div>
+          ) : !hidden && (
+            <div className="text-xs text-zinc-500 mt-0.5">
+              Required
+            </div>
           )}
         </div>
       </div>
-      <div className="flex items-center gap-2">
+
+      {/* Simplified action area */}
+      <div className="flex items-center gap-2 ml-3">
         <button
           onClick={() => setIsModalOpen(true)}
           className={cx(
-            "text-xs inline-flex items-center gap-1 rounded-md px-2 py-1 transition-colors",
+            "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
             isUploaded
-              ? "bg-green-500 text-white hover:bg-green-600"
-              : "bg-red-500 text-white hover:bg-red-600",
+              ? "bg-green-100 text-green-700 hover:bg-green-200"
+              : "bg-brand text-white hover:bg-brand/90"
           )}
         >
-          <UploadIcon />
           {isUploaded ? "Replace" : "Upload"}
         </button>
-        {isUploaded && (
-          <button
-            onClick={() => setConfirmClear(true)}
-            className="text-xs inline-flex items-center gap-1 rounded-md px-2 py-1 border border-red-300 text-red-600 hover:bg-red-50"
-          >
-            Clear
-          </button>
-        )}
-        {isCustom ? (
-          <button
-            onClick={onRemoveCustom}
-            className="text-xs inline-flex items-center gap-1 rounded-md px-2 py-1 border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-          >
-            Remove
-          </button>
-        ) : (
-          <button
-            onClick={onToggleHidden}
-            className={cx(
-              "text-xs inline-flex items-center gap-1 rounded-md px-2 py-1 border",
-              hidden
-                ? "border-brand text-brand hover:bg-brand/10"
-                : "border-zinc-200 text-zinc-600 hover:bg-zinc-50",
+        
+        {/* More options button */}
+        {(isUploaded || isCustom || !hidden) && (
+          <div className="relative">
+            <button
+              className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDropdown(!showDropdown);
+              }}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+              </svg>
+            </button>
+            
+            {/* Dropdown menu */}
+            {showDropdown && (
+              <>
+                {/* Backdrop to close dropdown */}
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setShowDropdown(false)}
+                />
+                
+                <div className="absolute right-0 top-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg py-1 z-20 min-w-24">
+                  {isUploaded && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmClear(true);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {isCustom ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveCustom();
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50"
+                    >
+                      Remove
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleHidden();
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50"
+                    >
+                      {hidden ? "Show" : "Hide"}
+                    </button>
+                  )}
+                </div>
+              </>
             )}
-          >
-            {hidden ? "Show" : "Hide"}
-          </button>
+          </div>
         )}
       </div>
 
@@ -425,13 +486,88 @@ function UploadModal({
   const [isUploading, setIsUploading] = useState(false);
   const [uploaded, setUploaded] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // Get file type icon
+  const getFileIcon = (filename: string) => {
+    const ext = filename.toLowerCase().split('.').pop();
+    switch (ext) {
+      case 'pdf':
+        return '📄';
+      case 'doc':
+      case 'docx':
+        return '📝';
+      case 'xls':
+      case 'xlsx':
+        return '📊';
+      case 'ppt':
+      case 'pptx':
+        return '📋';
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'gif':
+      case 'webp':
+        return '🖼️';
+      case 'zip':
+      case 'rar':
+        return '🗜️';
+      case 'txt':
+      case 'md':
+        return '📄';
+      default:
+        return '📎';
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setIsUploading(true);
+    setUploadProgress(0);
+    
+    // Simulate upload progress for better UX
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return prev + Math.random() * 20;
+      });
+    }, 100);
+
+    try {
+      await fetch(`/api/files/upload?filename=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        body: file,
+      });
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      // Small delay for smooth transition
+      setTimeout(() => {
+        setUploaded(true);
+        setFileName(file.name);
+        onUploaded(file.name);
+        onRefetch();
+      }, 300);
+    } catch (error) {
+      clearInterval(progressInterval);
+      console.error('Upload failed:', error);
+    } finally {
+      setTimeout(() => {
+        setIsUploading(false);
+      }, 500);
+    }
+  };
 
   return (
     <AnimatePresence>
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 bg-zinc-900/30 z-40"
+            className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm z-40"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -439,103 +575,227 @@ function UploadModal({
           />
           <motion.div
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
           >
-            <div className="w-[min(92vw,560px)] rounded-xl border border-zinc-200 bg-white shadow-soft p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-zinc-700">
-                  Upload: {targetLabel}
+            <motion.div 
+              className="w-[min(92vw,640px)] max-h-[90vh] rounded-2xl border border-zinc-200 bg-white shadow-2xl overflow-hidden"
+              layoutId="upload-modal"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-zinc-100 bg-gradient-to-r from-brand/5 to-brand/10">
+                <div>
+                  <h3 className="text-lg font-semibold text-zinc-800">
+                    Upload Document
+                  </h3>
+                  <p className="text-sm text-zinc-600 mt-1">
+                    {targetLabel}
+                  </p>
                 </div>
-                <button className="text-zinc-500 text-sm" onClick={onClose}>
-                  Close
+                <button 
+                  className="p-2 hover:bg-zinc-100 rounded-lg transition-colors" 
+                  onClick={onClose}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
 
-              <input ref={inputRef} type="file" className="hidden" onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                setIsUploading(true);
-                try {
-                  await fetch(`/api/files/upload?filename=${encodeURIComponent(file.name)}` , {
-                    method: "POST",
-                    body: file,
-                  });
-                  setUploaded(true);
-                  setFileName(file.name);
-                  onUploaded(file.name);
-                  onRefetch();
-                } finally {
-                  setIsUploading(false);
-                }
-              }} />
+              <div className="p-6">
+                <input 
+                  ref={inputRef} 
+                  type="file" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file);
+                  }} 
+                />
 
-              <div
-                className={cx(
-                  "mt-2 h-40 rounded-lg border border-dashed flex items-center justify-center",
-                  uploaded ? "border-green-300 bg-green-50" : "border-zinc-300 bg-zinc-50",
-                )}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                }}
-                onDrop={async (e) => {
-                  e.preventDefault();
-                  const file = e.dataTransfer.files?.[0];
-                  if (!file) return;
-                  setIsUploading(true);
-                  try {
-                    await fetch(`/api/files/upload?filename=${encodeURIComponent(file.name)}` , {
-                      method: "POST",
-                      body: file,
-                    });
-                    setUploaded(true);
-                    setFileName(file.name);
-                    onUploaded(file.name);
-                    onRefetch();
-                  } finally {
-                    setIsUploading(false);
-                  }
-                }}
-              >
-                <div className="text-center">
-                  <div className="text-sm text-zinc-700">Drag & drop file here</div>
-                  <div className="text-xs text-zinc-500">or</div>
-                  <button
-                    className="mt-2 inline-flex items-center gap-2 rounded-md bg-brand text-white px-3 py-1.5 text-sm shadow-soft hover:bg-brand-700"
-                    onClick={() => inputRef.current?.click()}
+                {/* Upload Area */}
+                <motion.div
+                  className={cx(
+                    "relative h-64 rounded-xl border-2 border-dashed transition-all duration-300 overflow-hidden",
+                    isDragOver 
+                      ? "border-brand bg-brand/10 scale-[1.02]"
+                      : uploaded 
+                        ? "border-green-300 bg-green-50" 
+                        : "border-zinc-300 bg-zinc-50 hover:bg-zinc-100"
+                  )}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleFileUpload(file);
+                  }}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                >
+                  <div className="absolute inset-0 flex items-center justify-center z-10">
+                    <AnimatePresence mode="wait">
+                      {isUploading ? (
+                        <motion.div
+                          key="uploading"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className="text-center"
+                        >
+                          <div className="relative mx-auto mb-4">
+                            <motion.div
+                              className="w-16 h-16 border-4 border-brand/20 border-t-brand rounded-full"
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <motion.span 
+                                className="text-xs font-medium text-brand"
+                                animate={{ scale: [1, 1.1, 1] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                              >
+                                {Math.round(uploadProgress)}%
+                              </motion.span>
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium text-zinc-700 mb-2">Uploading...</div>
+                          <div className="w-32 h-2 bg-zinc-200 rounded-full mx-auto overflow-hidden">
+                            <motion.div
+                              className="h-full bg-gradient-to-r from-brand to-brand/80 rounded-full"
+                              initial={{ width: "0%" }}
+                              animate={{ width: `${uploadProgress}%` }}
+                              transition={{ type: "spring", stiffness: 100 }}
+                            />
+                          </div>
+                        </motion.div>
+                      ) : uploaded ? (
+                        <motion.div
+                          key="uploaded"
+                          initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.5, y: -20 }}
+                          className="text-center"
+                        >
+                          <motion.div
+                            className="text-6xl mb-4"
+                            animate={{ 
+                              scale: [1, 1.1, 1],
+                              rotate: [0, 5, -5, 0]
+                            }}
+                            transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}
+                          >
+                            {fileName && getFileIcon(fileName)}
+                          </motion.div>
+                          <motion.div
+                            className="inline-flex items-center gap-2 text-green-600 font-medium mb-2"
+                            animate={{ scale: [1, 1.05, 1] }}
+                            transition={{ duration: 0.5 }}
+                          >
+                            <CheckIcon size={20} />
+                            Upload Complete!
+                          </motion.div>
+                          {fileName && (
+                            <div className="text-sm text-zinc-600 font-medium bg-white/80 px-3 py-1 rounded-lg border border-green-200">
+                              {fileName}
+                            </div>
+                          )}
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="upload-prompt"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="text-center"
+                        >
+                          <motion.div
+                            className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-brand to-brand/70 rounded-full flex items-center justify-center text-white"
+                            whileHover={{ scale: 1.1, rotate: 5 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <UploadIcon size={24} />
+                          </motion.div>
+                          <div className="text-lg font-medium text-zinc-700 mb-2">
+                            {isDragOver ? "Drop your file here" : "Drag & drop your file"}
+                          </div>
+                          <div className="text-sm text-zinc-500 mb-4">
+                            Support for PDF, DOC, XLS, PPT, Images and more
+                          </div>
+                          <motion.button
+                            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand/80 text-white px-6 py-3 text-sm font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                            onClick={() => inputRef.current?.click()}
+                            whileHover={{ scale: 1.05, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <UploadIcon size={18} />
+                            Choose File
+                          </motion.button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Animated background pattern */}
+                  {!isUploading && !uploaded && (
+                    <motion.div
+                      className="absolute inset-0 opacity-5 pointer-events-none"
+                      animate={{
+                        backgroundPosition: ["0% 0%", "100% 100%"],
+                      }}
+                      transition={{
+                        duration: 20,
+                        repeat: Infinity,
+                        repeatType: "reverse",
+                      }}
+                      style={{
+                        backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)",
+                        backgroundSize: "20px 20px",
+                      }}
+                    />
+                  )}
+                </motion.div>
+
+                {/* Footer actions */}
+                {uploaded && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 flex justify-end gap-3"
                   >
-                    <UploadIcon /> Choose file
-                  </button>
-
-                  <AnimatePresence>
-                    {isUploading && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="mt-2 text-xs text-zinc-500"
-                      >
-                        Uploading…
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <AnimatePresence>
-                    {uploaded && (
-                      <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.8, opacity: 0 }}
-                        className="mt-2 inline-flex items-center gap-1 text-green-600"
-                      >
-                        <CheckIcon /> Uploaded{fileName ? ` • ${fileName}` : ""}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                    <motion.button
+                      className="px-4 py-2 text-sm font-medium text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition-colors"
+                      onClick={() => {
+                        setUploaded(false);
+                        setFileName(null);
+                        setUploadProgress(0);
+                      }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Upload Another
+                    </motion.button>
+                    <motion.button
+                      className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 shadow-lg transition-all duration-200"
+                      onClick={onClose}
+                      whileHover={{ scale: 1.02, y: -1 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Done
+                    </motion.button>
+                  </motion.div>
+                )}
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         </>
       )}

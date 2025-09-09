@@ -7,6 +7,7 @@ import { Files } from "@/components/files";
 import { AnimatePresence, motion } from "framer-motion";
 import { FileIcon } from "@/components/icons";
 import { Message as PreviewMessage } from "@/components/message";
+import { ThinkingIndicator } from "@/components/thinking-indicator";
 import { useScrollToBottom } from "@/components/use-scroll-to-bottom";
 import { Session } from "next-auth";
 import useSWR from "swr";
@@ -110,34 +111,48 @@ export function Chat({
     useScrollToBottom<HTMLDivElement>();
 
   return (
-    <div className={`flex flex-row justify-center ${isWidget ? "pb-2 h-full" : "pb-24 h-dvh"} bg-white`}>
-      <div className={`flex flex-col justify-between items-center gap-4 ${isWidget ? "w-full" : ""}`}>
+    <div className={`flex flex-row justify-center ${isWidget ? "pb-4 h-full" : "pb-24 h-dvh"} bg-gradient-to-br from-slate-50 via-white to-blue-50/30`}>
+      <div className={`flex flex-col justify-between items-center ${isWidget ? "w-full gap-3" : "gap-6"}`}>
         {/* Perspective selector */}
-        <div className={`w-full ${isWidget ? "max-w-[680px]" : "md:max-w-[500px]"} px-4 md:px-0 pt-4`}>
-          <div className="inline-flex items-center gap-1 rounded-lg bg-zinc-50 border border-zinc-200 p-1">
+        <motion.div 
+          className={`w-full ${isWidget ? "max-w-[680px] px-3 pt-3" : "md:max-w-[600px] px-4 md:px-0 pt-6"}`}
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100/80 backdrop-blur-sm border border-slate-200/60 p-1.5 shadow-sm">
             {[
-              { key: "founder_raising", label: "Founder · Raising" },
-              { key: "investor_diligence", label: "Investor" },
-              { key: "acquirer_mna", label: "Acquirer" },
+              { key: "founder_raising", label: "Founder · Raising", color: "from-emerald-500 to-emerald-600" },
+              { key: "investor_diligence", label: "Investor", color: "from-blue-500 to-blue-600" },
+              { key: "acquirer_mna", label: "Acquirer", color: "from-purple-500 to-purple-600" },
             ].map((p) => (
-              <button
+              <motion.button
                 key={p.key}
                 onClick={() => setPerspective(p.key as any)}
                 type="button"
-                className={`px-2.5 py-1.5 text-sm rounded-md transition-colors ${
+                className={`relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                   perspective === p.key
-                    ? "bg-white text-brand shadow-soft"
-                    : "text-zinc-600 hover:text-zinc-800"
+                    ? `text-white shadow-md`
+                    : "text-slate-600 hover:text-slate-800 hover:bg-white/50"
                 }`}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                {p.label}
-              </button>
+                {perspective === p.key && (
+                  <motion.div
+                    className={`absolute inset-0 bg-gradient-to-r ${p.color} rounded-lg`}
+                    layoutId="activeTab"
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10">{p.label}</span>
+              </motion.button>
             ))}
           </div>
-        </div>
+        </motion.div>
         <div
           ref={messagesContainerRef}
-          className={`flex flex-col gap-4 h-full ${isWidget ? "w-full" : "w-dvw"} items-center overflow-y-scroll px-4`}
+          className={`flex flex-col gap-2 h-full ${isWidget ? "w-full px-3" : "w-dvw px-4"} items-center overflow-y-scroll scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent`}
         >
           {messages.map((message, index) => (
             <PreviewMessage
@@ -146,16 +161,9 @@ export function Chat({
               content={message.content}
             />
           ))}
-          {isLoading && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full md:w-[500px]">
-              <div className="flex items-center gap-2 text-zinc-500 text-sm">
-                <div className="size-2 rounded-full bg-brand animate-bounce [animation-delay:-0.2s]" />
-                <div className="size-2 rounded-full bg-brand animate-bounce" />
-                <div className="size-2 rounded-full bg-brand animate-bounce [animation-delay:0.2s]" />
-                <span className="ml-2">Assistant is typing…</span>
-              </div>
-            </motion.div>
-          )}
+          <AnimatePresence>
+            {isLoading && <ThinkingIndicator />}
+          </AnimatePresence>
           <div
             ref={messagesEndRef}
             className="flex-shrink-0 min-w-[24px] min-h-[24px]"
@@ -163,60 +171,117 @@ export function Chat({
         </div>
 
         {messages.length === 0 && (
-          <div className="grid grid-cols-1 gap-2 w-full px-4 md:px-0 mx-auto md:max-w-[500px]">
+          <motion.div 
+            className="grid grid-cols-1 gap-3 w-full px-4 md:px-0 mx-auto md:max-w-[600px]"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+          >
+            <motion.div
+              className="text-center mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+            >
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">
+                Get started with these suggestions
+              </h3>
+              <p className="text-sm text-slate-500">
+                Ask anything about your data room or try one of these popular questions
+              </p>
+            </motion.div>
             {(suggestionsByPerspective[perspective] || []).map((suggestedAction, index) => (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 * index }}
+                transition={{ delay: 0.7 + 0.1 * index, duration: 0.3 }}
                 key={index}
               >
-                <button
+                <motion.button
                   onClick={async () => {
                     append({
                       role: "user",
                       content: suggestedAction.action,
                     });
                   }}
-                  className="w-full text-left border border-zinc-200 text-zinc-700 rounded-lg p-2 text-sm hover:bg-zinc-50 transition-colors"
+                  className="w-full text-left border border-slate-200 text-slate-700 rounded-xl p-4 text-sm bg-white/80 backdrop-blur-sm hover:bg-white hover:shadow-md hover:border-blue-300 transition-all duration-200 group"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                 >
-                  <span className="font-medium">{suggestedAction.label}</span>
-                </button>
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 group-hover:bg-blue-500 transition-colors" />
+                    <div>
+                      <span className="font-medium text-slate-800 group-hover:text-blue-700 transition-colors">
+                        {suggestedAction.label}
+                      </span>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                        {suggestedAction.action.length > 80 
+                          ? suggestedAction.action.substring(0, 80) + "..." 
+                          : suggestedAction.action
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </motion.button>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
 
-        <form
-          className={`flex flex-row gap-2 relative items-center w-full ${isWidget ? "max-w-[680px]" : "md:max-w-[500px] max-w-[calc(100dvw-32px)]"} px-4 md:px-0`}
+        <motion.form
+          className={`flex flex-row gap-3 relative items-center w-full ${isWidget ? "max-w-[680px] px-3" : "md:max-w-[600px] max-w-[calc(100dvw-32px)] px-4 md:px-0"}`}
           onSubmit={handleSubmit}
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
         >
-          <input
-            className="bg-white border border-zinc-200 rounded-md px-3 py-2 flex-1 outline-none text-zinc-800 focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all placeholder:text-zinc-400"
-            placeholder="Send a message..."
-            value={input}
-            onChange={(event) => {
-              setInput(event.target.value);
-            }}
-          />
+          <div className="relative flex-1">
+            <motion.input
+              className="w-full bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl px-4 py-3 outline-none text-slate-800 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all placeholder:text-slate-400 shadow-sm hover:shadow-md focus:shadow-lg"
+              placeholder="Ask me anything about your data room..."
+              value={input}
+              onChange={(event) => {
+                setInput(event.target.value);
+              }}
+              whileFocus={{ scale: 1.01 }}
+              transition={{ duration: 0.2 }}
+            />
+            {input && (
+              <motion.button
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors shadow-sm"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Send
+              </motion.button>
+            )}
+          </div>
 
-          <div
-            className="relative text-sm bg-white border border-zinc-200 rounded-lg size-9 flex-shrink-0 flex flex-row items-center justify-center cursor-pointer hover:border-brand hover:text-brand transition-colors"
+          <motion.div
+            className="relative text-sm bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl size-12 flex-shrink-0 flex flex-row items-center justify-center cursor-pointer hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50/50 transition-all shadow-sm hover:shadow-md"
             onClick={() => {
               setIsFilesVisible(!isFilesVisible);
             }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             <FileIcon />
-            <motion.div
-              className="absolute text-xs -top-2 -right-2 bg-brand size-5 rounded-full flex flex-row justify-center items-center border-2 border-white text-white"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              {selectedFilePathnames?.length}
-            </motion.div>
-          </div>
-        </form>
+            {selectedFilePathnames?.length > 0 && (
+              <motion.div
+                className="absolute text-xs -top-1 -right-1 bg-blue-500 size-5 rounded-full flex flex-row justify-center items-center border-2 border-white text-white font-medium"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, type: "spring", stiffness: 500 }}
+              >
+                {selectedFilePathnames.length}
+              </motion.div>
+            )}
+          </motion.div>
+        </motion.form>
       </div>
 
       <AnimatePresence>
