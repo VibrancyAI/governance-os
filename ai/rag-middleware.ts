@@ -49,8 +49,9 @@ export const ragMiddleware: Experimental_LanguageModelV1Middleware = {
 
     // Classify the user prompt as whether it requires more context or not
     const { object: classification } = await generateObject({
-      // fast model for classification:
-      model: openai("gpt-4o-mini", { structuredOutputs: true }),
+      // use same env-configured model, prefer GPT-5 if available
+      model: openai(process.env.OPENAI_TEXT_MODEL || "gpt-5", { structuredOutputs: true }),
+      temperature: 1,
       output: "enum",
       enum: ["question", "statement", "other"],
       system: "classify the user message as a question, statement, or other",
@@ -65,8 +66,9 @@ export const ragMiddleware: Experimental_LanguageModelV1Middleware = {
 
     // Use hypothetical document embeddings:
     const { text: hypotheticalAnswer } = await generateText({
-      // fast model for generating hypothetical answer:
-      model: openai("gpt-4o-mini", { structuredOutputs: true }),
+      // use same env-configured model for consistency
+      model: openai(process.env.OPENAI_TEXT_MODEL || "gpt-5", { structuredOutputs: true }),
+      temperature: 1,
       system: "Answer the users question:",
       prompt: lastUserMessageContent,
     });
@@ -92,7 +94,7 @@ export const ragMiddleware: Experimental_LanguageModelV1Middleware = {
 
     // rank the chunks by similarity and take the top K
     chunksWithSimilarity.sort((a, b) => b.similarity - a.similarity);
-    const k = 10;
+    const k = 20;
     const topKChunks = chunksWithSimilarity.slice(0, k);
 
     // add the chunks to the last user message
@@ -102,7 +104,7 @@ export const ragMiddleware: Experimental_LanguageModelV1Middleware = {
         ...recentMessage.content,
         {
           type: "text",
-          text: "Here is some relevant information that you can use to answer the question:",
+          text: "Relevant context from the user's data room:",
         },
         ...topKChunks.map((chunk) => ({
           type: "text" as const,

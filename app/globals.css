@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-    --foreground-rgb: 0, 0, 0;
-    --background-start-rgb: 214, 219, 220;
+    --foreground-rgb: 17, 24, 39;
+    --background-start-rgb: 249, 250, 251;
     --background-end-rgb: 255, 255, 255;
 }
 
@@ -17,12 +17,14 @@
     font-family: "uncut sans", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root {
-        --foreground-rgb: 255, 255, 255;
-        --background-start-rgb: 0, 0, 0;
-        --background-end-rgb: 0, 0, 0;
-    }
+/* Light theme only */
+html, body {
+    background: rgb(var(--background-start-rgb));
+    color: rgb(var(--foreground-rgb));
+}
+
+::selection {
+    background: rgba(37, 99, 235, 0.2);
 }
 
 @layer utilities {

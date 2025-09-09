@@ -2,6 +2,7 @@ import { Navbar } from "@/components/navbar";
 import { Metadata } from "next";
 import { Toaster } from "sonner";
 import "./globals.css";
+import { ChatWidget } from "../components/chat-widget";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -23,6 +24,7 @@ export default function RootLayout({
         <Toaster position="top-center" />
         <Navbar />
         {children}
+        <ChatWidget />
       </body>
     </html>
   );

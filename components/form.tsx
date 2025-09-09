@@ -6,11 +6,11 @@ export function Form({
   children: React.ReactNode;
 }) {
   return (
-    <form action={action} className="flex flex-col gap-4 px-4 sm:px-16">
+    <form action={action} className="flex flex-col gap-4 px-4 sm:px-16 pb-8">
       <div>
         <label
           htmlFor="email"
-          className="block text-sm text-zinc-600 dark:text-zinc-400"
+          className="block text-sm text-zinc-700"
         >
           Email Address
         </label>
@@ -21,13 +21,13 @@ export function Form({
           placeholder="user@acme.com"
           autoComplete="email"
           required
-          className="mt-1 block w-full appearance-none rounded-md bg-zinc-100 px-3 py-2 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-black sm:text-sm dark:bg-zinc-700 dark:text-zinc-300"
+          className="mt-1 block w-full appearance-none rounded-md bg-white border border-zinc-200 px-3 py-2 placeholder-zinc-400 focus:border-brand focus:ring-2 focus:ring-brand/30 outline-none sm:text-sm transition-all"
         />
       </div>
       <div>
         <label
           htmlFor="password"
-          className="block text-sm text-zinc-600 dark:text-zinc-400"
+          className="block text-sm text-zinc-700"
         >
           Password
         </label>
@@ -36,7 +36,7 @@ export function Form({
           name="password"
           type="password"
           required
-          className="mt-1 block w-full appearance-none rounded-md bg-zinc-100 px-3 py-2 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-black sm:text-sm dark:bg-zinc-700 dark:text-zinc-300"
+          className="mt-1 block w-full appearance-none rounded-md bg-white border border-zinc-200 px-3 py-2 placeholder-zinc-400 focus:border-brand focus:ring-2 focus:ring-brand/30 outline-none sm:text-sm transition-all"
         />
       </div>
       {children}

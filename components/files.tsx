@@ -49,34 +49,34 @@ export const Files = ({
 
   return (
     <motion.div
-      className="fixed bg-zinc-900/50 h-dvh w-dvw top-0 left-0 z-40 flex flex-row justify-center items-center"
+      className="fixed bg-zinc-900/30 h-dvh w-dvw top-0 left-0 z-40 flex flex-row justify-center items-center"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
       <motion.div
         className={cx(
-          "fixed p-4 flex flex-col gap-4 bg-white dark:bg-zinc-800 z-30",
-          { "w-dvw h-96 bottom-0 right-0": !isDesktop },
-          { "w-[600px] h-96 rounded-lg": isDesktop },
+          "fixed p-4 flex flex-col gap-4 bg-white z-30 shadow-soft border border-zinc-200",
+          { "w-dvw h-96 bottom-0 right-0 rounded-t-lg": !isDesktop },
+          { "w-[640px] h-96 rounded-xl": isDesktop },
         )}
         initial={{
           y: "100%",
-          scale: isDesktop ? 0.9 : 1,
-          opacity: isDesktop ? 0 : 1,
+          scale: isDesktop ? 0.96 : 1,
+          opacity: 1,
         }}
         animate={{ y: "0%", scale: 1, opacity: 1 }}
         exit={{
           y: "100%",
-          scale: isDesktop ? 0.9 : 1,
-          opacity: isDesktop ? 0 : 1,
+          scale: isDesktop ? 0.96 : 1,
+          opacity: 1,
         }}
-        transition={{ type: "spring", stiffness: 400, damping: 40 }}
+        transition={{ type: "spring", stiffness: 380, damping: 36 }}
         ref={drawerRef}
       >
         <div className="flex flex-row justify-between items-center">
           <div className="text-sm flex flex-row gap-3">
-            <div className="text-zinc-900 dark:text-zinc-300">
+            <div className="text-zinc-900">
               Manage Knowledge Base
             </div>
           </div>
@@ -110,7 +110,7 @@ export const Files = ({
           />
 
           <div
-            className="bg-zinc-900 text-zinc-50 hover:bg-zinc-800 flex flex-row gap-2 items-center dark:text-zinc-800 text-sm dark:bg-zinc-100 rounded-md p-1 px-2 dark:hover:bg-zinc-200 cursor-pointer"
+            className="bg-brand text-white hover:bg-brand-700 flex flex-row gap-2 items-center text-sm rounded-md p-1.5 px-3 cursor-pointer shadow-soft"
             onClick={() => {
               inputFileRef.current?.click();
             }}
@@ -126,11 +126,11 @@ export const Files = ({
               {[44, 32, 52].map((item) => (
                 <div
                   key={item}
-                  className="flex flex-row gap-4 p-2 border-b dark:border-zinc-700 items-center"
+                  className="flex flex-row gap-4 p-2 border-b border-zinc-100 items-center"
                 >
-                  <div className="size-4 bg-zinc-200 dark:bg-zinc-600 animate-pulse" />
+                  <div className="size-4 bg-zinc-200 animate-pulse" />
                   <div
-                    className={`w-${item} h-4 bg-zinc-200 dark:bg-zinc-600 animate-pulse`}
+                    className={`w-${item} h-4 bg-zinc-200 animate-pulse`}
                   />
                   <div className="h-[24px] w-1" />
                 </div>
@@ -143,7 +143,7 @@ export const Files = ({
           uploadQueue.length === 0 &&
           deleteQueue.length === 0 ? (
             <div className="flex flex-col gap-4 items-center justify-center h-full">
-              <div className="flex flex-row gap-2 items-center text-zinc-500 dark:text-zinc-400 text-sm">
+              <div className="flex flex-row gap-2 items-center text-zinc-500 text-sm">
                 <InfoIcon />
                 <div>No files found</div>
               </div>
@@ -153,9 +153,9 @@ export const Files = ({
           {files?.map((file: any) => (
             <div
               key={file.pathname}
-              className={`flex flex-row p-2 border-b dark:border-zinc-700 ${
+              className={`flex flex-row p-2 border-b border-zinc-100 ${
                 selectedFilePathnames.includes(file.pathname)
-                  ? "bg-zinc-100 dark:bg-zinc-700 dark:border-zinc-600"
+                  ? "bg-brand/5"
                   : ""
               }`}
             >
@@ -178,7 +178,7 @@ export const Files = ({
                     "cursor-pointer",
                     selectedFilePathnames.includes(file.pathname) &&
                       !deleteQueue.includes(file.pathname)
-                      ? "text-blue-600 dark:text-zinc-50"
+                      ? "text-brand"
                       : "text-zinc-500",
                   )}
                 >
@@ -194,14 +194,14 @@ export const Files = ({
                 </div>
 
                 <div className="flex flex-row justify-between w-full">
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                  <div className="text-sm text-zinc-600">
                     {file.pathname}
                   </div>
                 </div>
               </div>
 
               <div
-                className="text-zinc-500 hover:bg-red-100 dark:text-zinc-500 hover:dark:bg-zinc-700 hover:text-red-500 p-1 px-2 cursor-pointer rounded-md"
+                className="text-zinc-500 hover:bg-red-50 hover:text-red-600 p-1 px-2 cursor-pointer rounded-md"
                 onClick={async () => {
                   setDeleteQueue((currentQueue) => [
                     ...currentQueue,
@@ -242,7 +242,7 @@ export const Files = ({
               </div>
 
               <div className="flex flex-row justify-between w-full">
-                <div className="text-sm text-zinc-400 dark:text-zinc-400">
+                <div className="text-sm text-zinc-500">
                   {fileName}
                 </div>
               </div>
@@ -253,7 +253,7 @@ export const Files = ({
         </div>
 
         <div className="flex flex-row justify-end">
-          <div className="text-zinc-500 dark:text-zinc-400 text-sm">
+          <div className="text-zinc-500 text-sm">
             {`${selectedFilePathnames.length}/${files?.length}`} Selected
           </div>
         </div>

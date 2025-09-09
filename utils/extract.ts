@@ -19,8 +19,9 @@ async function fetchAsBuffer(url: string): Promise<Buffer> {
 }
 
 async function getDocxContentFromUrl(url: string): Promise<string> {
-  const arrayBuffer = await fetchAsArrayBuffer(url);
-  const result = await mammoth.extractRawText({ arrayBuffer });
+  // mammoth prefers Buffer in Node environments; arrayBuffer path can fail
+  const buffer = await fetchAsBuffer(url);
+  const result = await mammoth.extractRawText({ buffer });
   return result.value || "";
 }
 
@@ -64,7 +65,14 @@ export async function extractTextFromUrl(
     return getPdfContentFromUrl(url);
   }
   if (lower.endsWith(".docx")) {
-    return getDocxContentFromUrl(url);
+    try {
+      return await getDocxContentFromUrl(url);
+    } catch {
+      // Fallback: try arrayBuffer path
+      const arrayBuffer = await fetchAsArrayBuffer(url);
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value || "";
+    }
   }
   if (lower.endsWith(".html") || lower.endsWith(".htm")) {
     return getHtmlContentFromUrl(url);
