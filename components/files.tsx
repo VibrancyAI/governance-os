@@ -97,7 +97,7 @@ export const Files = ({
     if (changed) {
       setSelectedFilePathnames(Array.from(have));
     }
-  }, [items]);
+  }, [items, selectedFilePathnames, setSelectedFilePathnames]);
 
   return (
     <motion.div
