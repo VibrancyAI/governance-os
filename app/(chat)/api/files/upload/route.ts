@@ -41,14 +41,29 @@ export async function POST(request: Request) {
     values: chunkedContent.map((chunk) => chunk.pageContent),
   });
 
-  await insertChunks({
-    chunks: chunkedContent.map((chunk, i) => ({
-      id: `${user.email}/${filename}/${i}`,
-      filePath: `${user.email}/${filename}`,
-      content: chunk.pageContent,
-      embedding: embeddings[i],
-    })),
-  });
+  // Upsert semantics: try insert; on conflict replace content/embedding
+  try {
+    await insertChunks({
+      chunks: chunkedContent.map((chunk, i) => ({
+        id: `${user.email}/${filename}/${i}`,
+        filePath: `${user.email}/${filename}`,
+        content: chunk.pageContent,
+        embedding: embeddings[i],
+      })),
+    });
+  } catch (e) {
+    // Best-effort overwrite: delete old chunks for this file then reinsert
+    // This avoids unique constraint violations when replacing files
+    await deleteChunksByFilePath({ filePath: `${user.email}/${filename}` });
+    await insertChunks({
+      chunks: chunkedContent.map((chunk, i) => ({
+        id: `${user.email}/${filename}/${i}`,
+        filePath: `${user.email}/${filename}`,
+        content: chunk.pageContent,
+        embedding: embeddings[i],
+      })),
+    });
+  }
 
   return Response.json({});
 }

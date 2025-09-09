@@ -12,18 +12,23 @@ import { Session } from "next-auth";
 import useSWR from "swr";
 import { fetcher } from "@/utils/functions";
 
-const suggestedActions = [
-  {
-    title: "What's the summary",
-    label: "of these documents?",
-    action: "what's the summary of these documents?",
-  },
-  {
-    title: "Who is the author",
-    label: "of these documents?",
-    action: "who is the author of these documents?",
-  },
-];
+const suggestionsByPerspective: Record<string, { label: string; action: string }[]> = {
+  founder_raising: [
+    { label: "Audit my data room for investor readiness", action: "Audit our data room for investor readiness. List missing or weak items and a priority plan to fix them." },
+    { label: "Draft use of proceeds and milestones", action: "Based on our docs, draft a clear use of proceeds and milestone plan for a Seed/Series A." },
+    { label: "Tighten narrative (problem/solution/market)", action: "Write a crisp problem/solution/market narrative using our materials; call out gaps to address." },
+  ],
+  investor_diligence: [
+    { label: "Diligence: what's missing and key risks?", action: "Perform investor diligence. List missing data room materials, key risks, red flags, and questions for founders." },
+    { label: "Unit economics + retention review", action: "Evaluate unit economics and retention from our docs; note assumptions and what needs more evidence." },
+    { label: "Competitor and moat check", action: "Summarize competition and our differentiation; indicate what's needed to substantiate a moat." },
+  ],
+  acquirer_mna: [
+    { label: "M&A readiness: missing items and risks", action: "Assess M&A readiness. List missing materials (contracts, IP, security), integration risks, and deal blockers." },
+    { label: "Synergies and integration outline", action: "From our docs, draft likely synergies and an initial integration outline; call out info gaps." },
+    { label: "Revenue quality and churn review", action: "Review revenue quality and churn from available docs; list missing evidence and buyer questions." },
+  ],
+};
 
 export function Chat({
   id,
@@ -83,12 +88,13 @@ export function Chat({
       session &&
       session.user &&
       allFiles &&
-      allFiles.length > 0 &&
-      selectedFilePathnames.length === 0
+      allFiles.length > 0
     ) {
-      setSelectedFilePathnames(allFiles.map((f) => f.pathname));
+      // Always keep selection in sync with currently available files
+      const uploaded = allFiles.map((f) => f.pathname);
+      setSelectedFilePathnames(uploaded);
     }
-  }, [isMounted, session, allFiles, selectedFilePathnames.length]);
+  }, [isMounted, session, allFiles]);
 
   const { messages, handleSubmit, input, setInput, append, isLoading } = useChat({
     body: { id, selectedFilePathnames, perspective },
@@ -157,14 +163,13 @@ export function Chat({
         </div>
 
         {messages.length === 0 && (
-          <div className="grid sm:grid-cols-2 gap-2 w-full px-4 md:px-0 mx-auto md:max-w-[500px]">
-            {suggestedActions.map((suggestedAction, index) => (
+          <div className="grid grid-cols-1 gap-2 w-full px-4 md:px-0 mx-auto md:max-w-[500px]">
+            {(suggestionsByPerspective[perspective] || []).map((suggestedAction, index) => (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05 * index }}
                 key={index}
-                className={index > 1 ? "hidden sm:block" : "block"}
               >
                 <button
                   onClick={async () => {
@@ -173,12 +178,9 @@ export function Chat({
                       content: suggestedAction.action,
                     });
                   }}
-                  className="w-full text-left border border-zinc-200 text-zinc-700 rounded-lg p-2 text-sm hover:bg-zinc-50 transition-colors flex flex-col"
+                  className="w-full text-left border border-zinc-200 text-zinc-700 rounded-lg p-2 text-sm hover:bg-zinc-50 transition-colors"
                 >
-                  <span className="font-medium">{suggestedAction.title}</span>
-                  <span className="text-zinc-500">
-                    {suggestedAction.label}
-                  </span>
+                  <span className="font-medium">{suggestedAction.label}</span>
                 </button>
               </motion.div>
             ))}

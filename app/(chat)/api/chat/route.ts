@@ -52,6 +52,10 @@ Output style:
     experimental_providerMetadata: {
       files: {
         selection: selectedFilePathnames,
+        // expose missing items to middleware-aware models
+        metadata: {
+          missing: selectedFilePathnames.length === 0 ? "all" : "partial",
+        },
       },
     },
     onFinish: async ({ text }) => {
