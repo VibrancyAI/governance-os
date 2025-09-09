@@ -159,26 +159,89 @@ export function DataRoom() {
             transition={{ delay: 0.02 * idx }}
             className="rounded-xl border border-zinc-200 bg-white shadow-soft"
           >
-            <div className="px-3 py-2.5 border-b border-zinc-200 flex items-center justify-between">
-              <div className="text-sm font-medium text-zinc-700 flex items-center gap-2">
-                <span className="inline-flex size-5 items-center justify-center rounded-full bg-brand/10 text-brand">●</span>
-                {section.category}
-              </div>
-              <div className="flex items-center gap-2">
-                <AddItemButton onAdd={(label) => addItem(section.category, label)} />
-                <div className="text-xs text-zinc-500">
-                  {doneCount}/{docs.length} required
+            <div className="px-4 py-3 border-b border-zinc-200">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <motion.div
+                    className={`w-3 h-3 rounded-full ${
+                      doneCount === docs.length && docs.length > 0
+                        ? "bg-gradient-to-r from-emerald-500 to-green-600"
+                        : doneCount > docs.length * 0.7
+                        ? "bg-gradient-to-r from-blue-500 to-indigo-600"
+                        : doneCount > docs.length * 0.5
+                        ? "bg-gradient-to-r from-amber-500 to-orange-600"
+                        : "bg-gradient-to-r from-brand to-brand-700"
+                    }`}
+                    animate={{ scale: [1, 1.15, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: idx * 0.2 }}
+                  />
+                  <h3 className="text-sm font-semibold text-zinc-800">{section.category}</h3>
+                </div>
+                <div className="flex items-center gap-3">
+                  <AddItemButton onAdd={(label) => addItem(section.category, label)} />
+                  <div className="text-right">
+                    <motion.div 
+                      className={`text-lg font-bold ${
+                        doneCount === docs.length && docs.length > 0
+                          ? "text-emerald-700"
+                          : doneCount > docs.length * 0.7
+                          ? "text-blue-700"
+                          : doneCount > docs.length * 0.5
+                          ? "text-amber-700"
+                          : "text-brand"
+                      }`}
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: idx * 0.1 }}
+                    >
+                      {Math.round((doneCount / Math.max(1, docs.length)) * 100)}%
+                    </motion.div>
+                    <div className="text-xs text-zinc-500 -mt-1">
+                      {doneCount}/{docs.length} items
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="px-3 pt-2">
-              <div className="h-1.5 w-full rounded-full bg-zinc-100 overflow-hidden">
+              <div className="h-3 w-full rounded-full bg-zinc-100 overflow-hidden relative shadow-inner">
                 <motion.div
-                  className="h-full bg-brand rounded-full"
+                  className={`h-full rounded-full shadow-sm ${
+                    doneCount === docs.length && docs.length > 0
+                      ? "bg-gradient-to-r from-emerald-500 to-green-600"
+                      : doneCount > docs.length * 0.7
+                      ? "bg-gradient-to-r from-blue-500 to-indigo-600"
+                      : doneCount > docs.length * 0.5
+                      ? "bg-gradient-to-r from-amber-500 to-orange-600"
+                      : "bg-gradient-to-r from-brand to-brand-700"
+                  }`}
                   initial={{ width: 0 }}
                   animate={{ width: `${(doneCount / Math.max(1, docs.length)) * 100}%` }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={{ type: "tween", ease: "easeOut", duration: 1.4, delay: 0.3 + idx * 0.1 }}
                 />
+                {/* Enhanced shimmer effect */}
+                <motion.div
+                  className="absolute inset-0 opacity-20"
+                  initial={{ backgroundPositionX: "-200%" }}
+                  animate={{ backgroundPositionX: "200%" }}
+                  transition={{ 
+                    repeat: Infinity, 
+                    duration: 8, 
+                    ease: "linear",
+                    delay: 1 + idx * 0.3 
+                  }}
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)",
+                    backgroundSize: "200px 100%",
+                  }}
+                />
+                {/* Completion pulse effect */}
+                {doneCount === docs.length && docs.length > 0 && (
+                  <motion.div
+                    className="absolute inset-0 bg-white rounded-full"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0.2, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 2 + idx * 0.2 }}
+                  />
+                )}
               </div>
             </div>
 
@@ -189,6 +252,7 @@ export function DataRoom() {
                   label={doc}
                   isUploaded={isDocUploaded(doc)}
                   attachedName={findMatchingFileName(doc)}
+                  attachedUrl={(files || []).find((f) => f.pathname === findMatchingFileName(doc))?.url}
                   uploadKey={`${slugify(section.category)}__${slugify(doc)}`}
                   onUploaded={handleUploaded}
                   hidden={isHidden(section.category, doc)}
@@ -226,35 +290,57 @@ function OverallProgress({
     (acc, s) => acc + getDocsForCategory(s.category).filter((d) => isDocUploaded(d)).length,
     0,
   );
-  const pct = Math.round((done / total) * 100);
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  const getStatusColor = (pct: number) => {
+    if (pct >= 90) return { bg: "from-emerald-500 to-green-600", text: "text-emerald-700" };
+    if (pct >= 70) return { bg: "from-blue-500 to-indigo-600", text: "text-blue-700" };
+    if (pct >= 50) return { bg: "from-amber-500 to-orange-600", text: "text-amber-700" };
+    return { bg: "from-red-500 to-rose-600", text: "text-red-700" };
+  };
+
+  const statusColor = getStatusColor(pct);
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-soft">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-sm font-medium text-zinc-700">Data Room Readiness</div>
-        <div className="text-sm text-zinc-600">{pct}%</div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <motion.div
+            className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${statusColor.bg}`}
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <div className="text-sm font-medium text-zinc-700">Data Room Readiness</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-zinc-500">{done}/{total} items</div>
+          <motion.div 
+            className={`text-xl font-bold ${statusColor.text}`}
+            animate={{ scale: [1, 1.02, 1] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          >
+            {pct}%
+          </motion.div>
+        </div>
       </div>
-      <div className="h-2 w-full rounded-full bg-zinc-100 overflow-hidden relative">
+      <div className="h-3 w-full rounded-full bg-zinc-100 overflow-hidden relative shadow-inner">
         <motion.div
-          className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand to-brand-700"
+          className={`absolute inset-y-0 left-0 bg-gradient-to-r ${statusColor.bg} shadow-sm`}
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={{ type: "spring", stiffness: 200, damping: 25, delay: 0.2 }}
         />
         <motion.div
-          className="absolute inset-0 opacity-20"
-          initial={{ backgroundPositionX: 0 }}
-          animate={{ backgroundPositionX: 200 }}
-          transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+          className="absolute inset-0 opacity-30"
+          initial={{ backgroundPositionX: "-100%" }}
+          animate={{ backgroundPositionX: "200%" }}
+          transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
           style={{
             backgroundImage:
-              "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 50%, rgba(255,255,255,0) 100%)",
+              "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)",
             backgroundSize: "200px 100%",
           }}
         />
-      </div>
-      <div className="mt-2 text-xs text-zinc-500">
-        {done}/{total} required items
       </div>
     </div>
   );
@@ -265,6 +351,7 @@ function DataRoomItem({
   isUploaded,
   uploadKey,
   attachedName,
+  attachedUrl,
   onUploaded,
   hidden,
   onToggleHidden,
@@ -276,6 +363,7 @@ function DataRoomItem({
   isUploaded: boolean;
   uploadKey: string;
   attachedName?: string;
+  attachedUrl?: string;
   onUploaded: (docLabel: string, fileName: string) => void;
   hidden: boolean;
   onToggleHidden: () => void;
@@ -287,8 +375,12 @@ function DataRoomItem({
   const [confirmClear, setConfirmClear] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  return (
-    <li
+  const viewerHref = attachedName
+    ? `?name=${encodeURIComponent(attachedName)}`
+    : undefined;
+
+  const content = (
+    <motion.div
       className={cx(
         "flex items-center justify-between py-3 px-3 rounded-lg transition-colors",
         hidden
@@ -297,45 +389,88 @@ function DataRoomItem({
           ? "bg-gradient-to-r from-green-50/80 to-emerald-50/80 border border-green-200/60"
           : "bg-white border border-zinc-200/60",
       )}
+      whileHover={viewerHref ? { y: -1 } : undefined}
     >
       {/* Simple status indicator */}
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div
-          className={cx(
-            "w-2 h-2 rounded-full flex-shrink-0",
-            hidden 
-              ? "bg-zinc-400" 
-              : isUploaded 
-                ? "bg-green-500"
-                : "bg-amber-500"
-          )}
-        />
-        
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className={cx(
-              "text-sm font-medium truncate",
-              hidden ? "text-zinc-500" : "text-zinc-700"
-            )}>
-              {label}
-            </span>
-            {isCustom && (
-              <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-600 flex-shrink-0">
-                Custom
-              </span>
-            )}
-          </div>
-          
-          {isUploaded && attachedName ? (
-            <div className="text-xs text-zinc-500 truncate mt-0.5">
-              {attachedName}
+        {viewerHref ? (
+          <a
+            href={viewerHref}
+            className="flex items-center gap-3 min-w-0 flex-1"
+          >
+            <div
+              className={cx(
+                "w-2 h-2 rounded-full flex-shrink-0",
+                hidden
+                  ? "bg-zinc-400"
+                  : isUploaded
+                  ? "bg-green-500"
+                  : "bg-amber-500",
+              )}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cx(
+                    "text-sm font-medium truncate",
+                    hidden ? "text-zinc-500" : "text-zinc-700",
+                  )}
+                >
+                  {label}
+                </span>
+                {isCustom && (
+                  <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-600 flex-shrink-0">
+                    Custom
+                  </span>
+                )}
+              </div>
+              {isUploaded && attachedName ? (
+                <div className="text-xs text-zinc-500 truncate mt-0.5">
+                  {attachedName}
+                </div>
+              ) : !hidden ? (
+                <div className="text-xs text-zinc-500 mt-0.5">Required</div>
+              ) : null}
             </div>
-          ) : !hidden && (
-            <div className="text-xs text-zinc-500 mt-0.5">
-              Required
+          </a>
+        ) : (
+          <>
+            <div
+              className={cx(
+                "w-2 h-2 rounded-full flex-shrink-0",
+                hidden
+                  ? "bg-zinc-400"
+                  : isUploaded
+                  ? "bg-green-500"
+                  : "bg-amber-500",
+              )}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cx(
+                    "text-sm font-medium truncate",
+                    hidden ? "text-zinc-500" : "text-zinc-700",
+                  )}
+                >
+                  {label}
+                </span>
+                {isCustom && (
+                  <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-600 flex-shrink-0">
+                    Custom
+                  </span>
+                )}
+              </div>
+              {isUploaded && attachedName ? (
+                <div className="text-xs text-zinc-500 truncate mt-0.5">
+                  {attachedName}
+                </div>
+              ) : !hidden ? (
+                <div className="text-xs text-zinc-500 mt-0.5">Required</div>
+              ) : null}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       {/* Simplified action area */}
@@ -353,7 +488,7 @@ function DataRoomItem({
         </button>
         
         {/* More options button */}
-        {(isUploaded || isCustom || !hidden) && (
+        {true && (
           <div className="relative">
             <button
               className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
@@ -463,8 +598,10 @@ function DataRoomItem({
           onRefetch();
         }}
       />
-    </li>
+    </motion.div>
   );
+
+  return <li>{content}</li>;
 }
 
 // StatusDot removed in favor of bold icon and background color
@@ -567,14 +704,14 @@ function UploadModal({
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm z-[60]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4"
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -880,7 +1017,7 @@ function DangerZone({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-4">
+    <div className="my-8 mb-20 rounded-2xl border border-red-200 bg-red-50 p-4">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-sm font-medium text-red-700">Danger zone</div>

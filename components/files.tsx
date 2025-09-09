@@ -20,10 +20,14 @@ export const Files = ({
   selectedFilePathnames,
   setSelectedFilePathnames,
   setIsFilesVisible,
+  hasUserDeselected,
+  onUserDeselected,
 }: {
   selectedFilePathnames: string[];
   setSelectedFilePathnames: Dispatch<SetStateAction<string[]>>;
   setIsFilesVisible: Dispatch<SetStateAction<boolean>>;
+  hasUserDeselected?: boolean;
+  onUserDeselected?: () => void;
 }) => {
   const inputFileRef = useRef<HTMLInputElement>(null);
   const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
@@ -84,6 +88,7 @@ export const Files = ({
 
   // Ensure all uploaded items are selected by default (and kept in sync)
   useEffect(() => {
+    if (hasUserDeselected) return;
     const allUploaded = items.filter((i) => i.fileName).map((i) => i.fileName!) as string[];
     if (allUploaded.length === 0) return;
     const have = new Set(selectedFilePathnames);
@@ -217,6 +222,7 @@ export const Files = ({
                   if (!item.fileName) return;
                   setSelectedFilePathnames((currentSelections) => {
                     if (currentSelections.includes(item.fileName!)) {
+                      onUserDeselected && onUserDeselected();
                       return currentSelections.filter(
                         (path) => path !== item.fileName,
                       );
@@ -280,6 +286,7 @@ export const Files = ({
                       setSelectedFilePathnames((currentSelections) =>
                         currentSelections.filter((path) => path !== file.pathname),
                       );
+                      onUserDeselected && onUserDeselected();
 
                       mutate((files || []).filter((f) => f.pathname !== file.pathname));
                     }}

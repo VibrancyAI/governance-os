@@ -3,6 +3,7 @@ import { Metadata } from "next";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { ChatWidget } from "../components/chat-widget";
+import { FileViewerOverlay } from "@/components/file-viewer-overlay";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -24,6 +25,7 @@ export default function RootLayout({
         <Toaster position="top-center" />
         <Navbar />
         {children}
+        <FileViewerOverlay />
         <ChatWidget />
       </body>
     </html>

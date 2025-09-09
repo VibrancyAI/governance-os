@@ -50,6 +50,7 @@ export function Chat({
   const [perspective, setPerspective] = useState<
     "founder_raising" | "investor_diligence" | "acquirer_mna"
   >("founder_raising");
+  const [hasUserDeselected, setHasUserDeselected] = useState(false);
 
   useEffect(() => {
     if (isMounted !== false && session && session.user) {
@@ -66,6 +67,14 @@ export function Chat({
 
   useEffect(() => {
     if (session && session.user) {
+      // load user deselection preference
+      try {
+        const flag = localStorage.getItem(
+          `${session.user.email}/has-user-deselected`,
+        );
+        setHasUserDeselected(flag === "true");
+      } catch {}
+
       setSelectedFilePathnames(
         JSON.parse(
           localStorage.getItem(
@@ -75,6 +84,18 @@ export function Chat({
       );
     }
   }, [session]);
+
+  // Auto-open the file selector once per chat for visibility before passing files
+  useEffect(() => {
+    if (!isMounted || !session || !session.user) return;
+    try {
+      const key = `${session.user.email}/chat/${id}/opened-files-modal`;
+      if (!localStorage.getItem(key)) {
+        setIsFilesVisible(true);
+        localStorage.setItem(key, "true");
+      }
+    } catch {}
+  }, [isMounted, session, id]);
 
   // Load all files and default-select them if nothing selected yet
   const { data: allFiles } = useSWR<Array<{ pathname: string }>>(
@@ -89,13 +110,14 @@ export function Chat({
       session &&
       session.user &&
       allFiles &&
-      allFiles.length > 0
+      allFiles.length > 0 &&
+      !hasUserDeselected
     ) {
-      // Always keep selection in sync with currently available files
+      // Default: select all uploaded files until the user deselects something
       const uploaded = allFiles.map((f) => f.pathname);
       setSelectedFilePathnames(uploaded);
     }
-  }, [isMounted, session, allFiles]);
+  }, [isMounted, session, allFiles, hasUserDeselected]);
 
   const { messages, handleSubmit, input, setInput, append, isLoading } = useChat({
     body: { id, selectedFilePathnames, perspective },
@@ -290,6 +312,20 @@ export function Chat({
             setIsFilesVisible={setIsFilesVisible}
             selectedFilePathnames={selectedFilePathnames}
             setSelectedFilePathnames={setSelectedFilePathnames}
+            hasUserDeselected={hasUserDeselected}
+            onUserDeselected={() => {
+              if (!hasUserDeselected) {
+                setHasUserDeselected(true);
+                if (session && session.user) {
+                  try {
+                    localStorage.setItem(
+                      `${session.user.email}/has-user-deselected`,
+                      "true",
+                    );
+                  } catch {}
+                }
+              }
+            }}
           />
         )}
       </AnimatePresence>
