@@ -7,7 +7,12 @@ import { chat, chunk, user } from "@/schema";
 // Optionally, if not using email/pass login, you can
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
-let client = postgres(`${process.env.POSTGRES_URL!}?sslmode=require`);
+// Accept Neon/managed Postgres URLs as-is; append sslmode=require only if missing
+const rawDatabaseUrl = process.env.POSTGRES_URL!;
+const databaseUrl = /[?&]sslmode=/.test(rawDatabaseUrl)
+  ? rawDatabaseUrl
+  : `${rawDatabaseUrl}${rawDatabaseUrl.includes("?") ? "&" : "?"}sslmode=require`;
+let client = postgres(databaseUrl);
 let db = drizzle(client);
 
 export async function getUser(email: string) {

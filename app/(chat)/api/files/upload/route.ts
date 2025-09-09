@@ -1,6 +1,6 @@
 import { auth } from "@/app/(auth)/auth";
 import { insertChunks } from "@/app/db";
-import { getPdfContentFromUrl } from "@/utils/pdf";
+import { extractTextFromUrl } from "@/utils/extract";
 import { openai } from "@ai-sdk/openai";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { put } from "@vercel/blob";
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     access: "public",
   });
 
-  const content = await getPdfContentFromUrl(downloadUrl);
+  const content = await extractTextFromUrl(filename || "", downloadUrl);
   const textSplitter = new RecursiveCharacterTextSplitter({
     chunkSize: 1000,
   });

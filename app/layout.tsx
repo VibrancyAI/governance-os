@@ -7,9 +7,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     "https://ai-sdk-preview-internal-knowledge-base.vercel.app",
   ),
-  title: "Internal Knowledge Base",
+  title: "Governance OS",
   description:
-    "Internal Knowledge Base using Retrieval Augmented Generation and Middleware",
+    "Governance operating system for startups",
 };
 
 export default function RootLayout({
