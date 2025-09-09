@@ -35,6 +35,7 @@ export const Files = ({
   } = useSWR<
     Array<{
       pathname: string;
+      url?: string;
     }>
   >("api/files/list", fetcher, {
     fallbackData: [],

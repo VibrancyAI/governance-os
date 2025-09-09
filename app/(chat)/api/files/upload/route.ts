@@ -1,5 +1,5 @@
 import { auth } from "@/app/(auth)/auth";
-import { insertChunks } from "@/app/db";
+import { insertChunks, deleteChunksByFilePath } from "@/app/db";
 import { extractTextFromUrl } from "@/utils/extract";
 import { openai } from "@ai-sdk/openai";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
