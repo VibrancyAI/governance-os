@@ -5,7 +5,15 @@ import { Resend } from "resend";
 import { InviteEmail } from "@/emails/InviteEmail";
 
 const apiKey = process.env.RESEND_API_KEY || process.env.RESEND_KEY || "";
-const resend = new Resend(apiKey);
+// Lazily instantiate to avoid build-time throw when env var is missing in build step
+let resend: Resend | null = null;
+if (apiKey) {
+  try {
+    resend = new Resend(apiKey);
+  } catch {
+    resend = null;
+  }
+}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -28,7 +36,7 @@ export async function POST(request: Request) {
   const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const acceptUrl = `${appUrl}/api/orgs/invite/accept?token=${encodeURIComponent(token)}`;
 
-  if (!apiKey) {
+  if (!apiKey || !resend) {
     return Response.json({ ok: true, sent: false, token });
   }
 
