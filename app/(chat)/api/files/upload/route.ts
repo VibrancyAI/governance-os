@@ -5,6 +5,7 @@ import { openai } from "@ai-sdk/openai";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { put } from "@vercel/blob";
 import { embedMany } from "ai";
+import { getCurrentOrgIdOrSetDefault } from "@/app/api/orgs/_utils";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -17,7 +18,6 @@ export async function POST(request: Request) {
   }
 
   const { user } = session;
-
   if (!user) {
     return Response.redirect("/login");
   }
@@ -26,7 +26,8 @@ export async function POST(request: Request) {
     return new Response("Request body is empty", { status: 400 });
   }
 
-  const { downloadUrl } = await put(`${user.email}/${filename}`, request.body, {
+  const orgId = await getCurrentOrgIdOrSetDefault(user.email!);
+  const { downloadUrl } = await put(`${orgId}/${filename}`, request.body, {
     access: "public",
   });
 
@@ -45,8 +46,8 @@ export async function POST(request: Request) {
   try {
     await insertChunks({
       chunks: chunkedContent.map((chunk, i) => ({
-        id: `${user.email}/${filename}/${i}`,
-        filePath: `${user.email}/${filename}`,
+        id: `${orgId}/${filename}/${i}`,
+        filePath: `${orgId}/${filename}`,
         content: chunk.pageContent,
         embedding: embeddings[i],
       })),
@@ -54,11 +55,11 @@ export async function POST(request: Request) {
   } catch (e) {
     // Best-effort overwrite: delete old chunks for this file then reinsert
     // This avoids unique constraint violations when replacing files
-    await deleteChunksByFilePath({ filePath: `${user.email}/${filename}` });
+    await deleteChunksByFilePath({ filePath: `${orgId}/${filename}` });
     await insertChunks({
       chunks: chunkedContent.map((chunk, i) => ({
-        id: `${user.email}/${filename}/${i}`,
-        filePath: `${user.email}/${filename}`,
+        id: `${orgId}/${filename}/${i}`,
+        filePath: `${orgId}/${filename}`,
         content: chunk.pageContent,
         embedding: embeddings[i],
       })),

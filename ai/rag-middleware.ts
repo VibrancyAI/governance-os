@@ -31,6 +31,8 @@ export const ragMiddleware: Experimental_LanguageModelV1Middleware = {
     if (!success) return params; // no files selected
 
     const selection = data.files.selection;
+    const orgId = (providerMetadata as any)?.files?.orgId as string | undefined;
+    if (!orgId) return params;
 
     const recentMessage = messages.pop();
 
@@ -81,7 +83,7 @@ export const ragMiddleware: Experimental_LanguageModelV1Middleware = {
 
     // find relevant chunks based on the selection
     const chunksBySelection = await getChunksByFilePaths({
-      filePaths: selection.map((path) => `${session.user?.email}/${path}`),
+      filePaths: selection.map((path) => `${orgId}/${path}`),
     });
 
     const chunksWithSimilarity = chunksBySelection.map((chunk) => ({

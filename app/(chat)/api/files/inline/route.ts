@@ -1,5 +1,6 @@
 import { auth } from "@/app/(auth)/auth";
 import { list } from "@vercel/blob";
+import { getCurrentOrgIdOrSetDefault } from "@/app/api/orgs/_utils";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -14,11 +15,9 @@ export async function GET(request: Request) {
     return Response.redirect("/login");
   }
 
-  const userEmail = session.user.email;
-
-  // Find blob by exact path: <email>/<name>
-  const { blobs } = await list({ prefix: userEmail });
-  const blob = blobs.find((b) => b.pathname === `${userEmail}/${name}`);
+  const orgId = await getCurrentOrgIdOrSetDefault(session.user.email);
+  const { blobs } = await list({ prefix: orgId });
+  const blob = blobs.find((b) => b.pathname === `${orgId}/${name}`);
   if (!blob) {
     return new Response("Not found", { status: 404 });
   }

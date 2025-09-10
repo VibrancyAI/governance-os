@@ -65,7 +65,7 @@ export const Files = ({
 
   // Server-side associations for stable mappings across devices
   const { data: assocRows } = useSWR<
-    Array<{ userEmail: string; labelSlug: string; fileName: string }>
+    Array<{ orgId: string; labelSlug: string; fileName: string }>
   >("/api/files/associations", fetcher, { fallbackData: [] });
   const associations = useMemo(() => {
     const map: Record<string, string> = {};

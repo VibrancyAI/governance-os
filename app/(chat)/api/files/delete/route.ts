@@ -1,6 +1,7 @@
 import { auth } from "@/app/(auth)/auth";
 import { deleteChunksByFilePath, deleteFileAssociationsByFileName } from "@/app/db";
 import { head, del } from "@vercel/blob";
+import { getCurrentOrgIdOrSetDefault } from "@/app/api/orgs/_utils";
 
 export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,7 +13,6 @@ export async function DELETE(request: Request) {
   }
 
   const { user } = session;
-
   if (!user || !user.email) {
     return Response.redirect("/login");
   }
@@ -28,16 +28,14 @@ export async function DELETE(request: Request) {
   }
 
   const { pathname } = await head(fileurl);
-
-  if (!pathname.startsWith(user.email)) {
+  const orgId = await getCurrentOrgIdOrSetDefault(user.email);
+  if (!pathname.startsWith(orgId)) {
     return new Response("Unauthorized", { status: 400 });
   }
 
   await del(fileurl);
   await deleteChunksByFilePath({ filePath: pathname });
-  // Also remove any associations referencing this filename for this user
-  const fileName = pathname.replace(`${user.email}/`, "");
-  await deleteFileAssociationsByFileName({ userEmail: user.email, fileName });
+  // org association cleanup is handled client-side per labelSlug
 
   return Response.json({});
 }

@@ -61,3 +61,4 @@ export const ThinkingIndicator = () => {
     </motion.div>
   );
 };
+

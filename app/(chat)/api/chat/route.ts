@@ -2,6 +2,7 @@ import { customModel } from "@/ai";
 import { auth } from "@/app/(auth)/auth";
 import { createMessage } from "@/app/db";
 import { streamText } from "ai";
+import { getCurrentOrgIdOrSetDefault } from "@/app/api/orgs/_utils";
 
 export async function POST(request: Request) {
   const { id, messages, selectedFilePathnames, perspective } = await request.json();
@@ -43,6 +44,8 @@ Output style:
     }
   })();
 
+  const orgId = await getCurrentOrgIdOrSetDefault(session.user!.email!);
+
   const result = streamText({
     model: customModel,
     system: perspectiveSystem,
@@ -56,6 +59,7 @@ Output style:
         metadata: {
           missing: selectedFilePathnames.length === 0 ? "all" : "partial",
         },
+        orgId,
       },
     },
     onFinish: async ({ text }) => {
