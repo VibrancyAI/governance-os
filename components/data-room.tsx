@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { dataRoomStructure, slugify } from "./data-room-structure";
 import { motion, AnimatePresence } from "framer-motion";
+import { Portal } from "@/components/portal";
 import useSWR from "swr";
 import { fetcher } from "@/utils/functions";
 import cx from "classnames";
@@ -24,15 +25,38 @@ export function DataRoom() {
   );
 
   const [associations, setAssociations] = useState<Record<string, string>>({});
-
+  const { data: assocRows, mutate: mutateAssoc } = useSWR<
+    Array<{ userEmail: string; labelSlug: string; fileName?: string; workingUrl?: string }>
+  >("/api/files/associations", fetcher, { fallbackData: [] });
+  useEffect(() => {
+    if (!assocRows) return;
+    const map: Record<string, string> = {};
+    for (const row of assocRows) {
+      if (row.fileName) map[row.labelSlug] = row.fileName;
+    }
+    setAssociations(map);
+  }, [assocRows]);
+  // one-time migration from legacy localStorage to server
   useEffect(() => {
     try {
       const stored = JSON.parse(
         localStorage.getItem("data-room-associations") || "{}",
       );
-      setAssociations(stored);
+      if (stored && Object.keys(stored).length > 0) {
+        (async () => {
+          for (const [labelSlug, fileName] of Object.entries(stored)) {
+            await fetch("/api/files/associations", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ labelSlug, fileName }),
+            });
+          }
+          localStorage.removeItem("data-room-associations");
+          mutateAssoc();
+        })();
+      }
     } catch {}
-  }, []);
+  }, [mutateAssoc]);
 
   const uploadedSet = useMemo(
     () => new Set(files?.map((f) => f.pathname)),
@@ -60,14 +84,16 @@ export function DataRoom() {
     return Boolean(findMatchingFileName(doc));
   }
 
-  function handleUploaded(doc: string, fileName: string) {
+  async function handleUploaded(doc: string, fileName: string) {
     const normDoc = normalize(doc);
-    const next = { ...associations, [normDoc]: fileName };
-    setAssociations(next);
-    try {
-      localStorage.setItem("data-room-associations", JSON.stringify(next));
-    } catch {}
+    setAssociations((prev) => ({ ...prev, [normDoc]: fileName }));
+    await fetch("/api/files/associations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ labelSlug: normDoc, fileName }),
+    });
     mutate();
+    mutateAssoc();
   }
 
   // CRUD: customizable structure persisted locally
@@ -89,7 +115,11 @@ export function DataRoom() {
   function saveCustom(next: CustomDataRoom) {
     localStorage.setItem("data-room-custom-structure", JSON.stringify(next));
   }
-  const [custom, setCustom] = useState<CustomDataRoom>(() => loadCustom());
+  const [custom, setCustom] = useState<CustomDataRoom>({ added: {}, hidden: {} });
+  useEffect(() => {
+    // Load from localStorage after mount to avoid hydration mismatch
+    setCustom(loadCustom());
+  }, []);
   function addItem(category: string, label: string) {
     const next: CustomDataRoom = {
       added: { ...custom.added },
@@ -134,6 +164,22 @@ export function DataRoom() {
   function getDocsForCategory(category: string): string[] {
     // visible docs for readiness calculation
     return getDocsAll(category).filter((d) => !isHidden(category, d));
+  }
+
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => { setIsHydrated(true); }, []);
+
+  if (!isHydrated) {
+    return (
+      <div className="px-4 md:px-8 pt-20">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-soft animate-pulse h-24" />
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-zinc-200 bg-white shadow-soft h-40 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -260,16 +306,20 @@ export function DataRoom() {
                   onRemoveCustom={() => removeCustomItem(section.category, doc)}
                   isCustom={(custom.added[section.category] || []).includes(doc)}
                   onRefetch={() => mutate()}
+                  onAssocChanged={() => mutateAssoc()}
                 />)
               )}
             </ul>
           </motion.div>
         );})}
       </div>
-      <DangerZone files={files || []} onCleared={() => {
+      <DangerZone files={files || []} onCleared={async () => {
         setAssociations({});
-        localStorage.removeItem("data-room-associations");
+        try {
+          await fetch("/api/files/associations?all=true", { method: "DELETE" });
+        } catch {}
         mutate();
+        mutateAssoc();
       }} />
     </div>
   );
@@ -358,6 +408,7 @@ function DataRoomItem({
   onRemoveCustom,
   isCustom,
   onRefetch,
+  onAssocChanged,
 }: {
   label: string;
   isUploaded: boolean;
@@ -370,6 +421,7 @@ function DataRoomItem({
   onRemoveCustom: () => void;
   isCustom: boolean;
   onRefetch: () => void;
+  onAssocChanged: () => void;
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -425,9 +477,7 @@ function DataRoomItem({
                 )}
               </div>
               {isUploaded && attachedName ? (
-                <div className="text-xs text-zinc-500 truncate mt-0.5">
-                  {attachedName}
-                </div>
+                <div className="text-xs text-zinc-500 truncate mt-0.5">{attachedName}</div>
               ) : !hidden ? (
                 <div className="text-xs text-zinc-500 mt-0.5">Required</div>
               ) : null}
@@ -554,22 +604,25 @@ function DataRoomItem({
         )}
       </div>
 
-      <UploadModal
-        open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        targetLabel={label}
-        onUploaded={(fileName) => onUploaded(label, fileName)}
-        onRefetch={onRefetch}
-      />
+      <Portal>
+        <UploadModal
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          targetLabel={label}
+          onUploaded={(fileName) => onUploaded(label, fileName)}
+          onRefetch={onRefetch}
+        />
+      </Portal>
 
-      <ConfirmModal
-        open={confirmClear}
-        title="Remove the uploaded file?"
-        description="This deletes the file and its embeddings for this item."
-        confirmLabel="Delete"
-        tone="danger"
-        onClose={() => setConfirmClear(false)}
-        onConfirm={async () => {
+      <Portal>
+        <ConfirmModal
+          open={confirmClear}
+          title="Remove the uploaded file?"
+          description="This deletes the file and its embeddings for this item."
+          confirmLabel="Delete"
+          tone="danger"
+          onClose={() => setConfirmClear(false)}
+          onConfirm={async () => {
           if (!attachedName) return setConfirmClear(false);
           try {
             const res = await fetch(`/api/files/list`);
@@ -581,23 +634,23 @@ function DataRoomItem({
               });
             }
           } catch {}
-          // clear local association mapping
+          // clear association mapping on server
           const norm = label
             .toLowerCase()
             .replace(/\.[a-z0-9]{1,6}$/i, "")
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/(^-|-$)+/g, "");
           try {
-            const map = JSON.parse(
-              localStorage.getItem("data-room-associations") || "{}",
-            );
-            delete map[norm];
-            localStorage.setItem("data-room-associations", JSON.stringify(map));
+            await fetch(`/api/files/associations?labelSlug=${encodeURIComponent(norm)}`, {
+              method: "DELETE",
+            });
           } catch {}
           setConfirmClear(false);
           onRefetch();
-        }}
-      />
+          onAssocChanged();
+          }}
+        />
+      </Portal>
     </motion.div>
   );
 
@@ -1031,13 +1084,14 @@ function DangerZone({
         </button>
       </div>
 
-      <ConfirmAllModal
-        open={open}
-        input={input}
-        setInput={setInput}
-        busy={busy}
-        onClose={() => setOpen(false)}
-        onConfirm={async () => {
+      <Portal>
+        <ConfirmAllModal
+          open={open}
+          input={input}
+          setInput={setInput}
+          busy={busy}
+          onClose={() => setOpen(false)}
+          onConfirm={async () => {
           if (input !== "DELETE ALL") return;
           setBusy(true);
           try {
@@ -1053,8 +1107,9 @@ function DangerZone({
             setBusy(false);
             setOpen(false);
           }
-        }}
-      />
+          }}
+        />
+      </Portal>
     </div>
   );
 }
@@ -1137,6 +1192,100 @@ function AddItemButton({ onAdd }: { onAdd: (label: string) => void }) {
       >
         + Add
       </button>
+      <Portal>
+        <AnimatePresence>
+          {open && (
+            <>
+              <motion.div
+                className="fixed inset-0 bg-zinc-900/30 z-40"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setOpen(false)}
+              />
+              <motion.div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+              >
+                <div className="w-[min(92vw,420px)] rounded-xl border border-zinc-200 bg-white shadow-soft p-4">
+                  <div className="text-sm font-medium text-zinc-800">Add checklist item</div>
+                  <input
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    placeholder="Document name"
+                    className="mt-3 w-full border border-zinc-200 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-brand/30 focus:border-brand outline-none"
+                  />
+                  <div className="mt-3 flex items-center justify-end gap-2">
+                    <button
+                      className="text-xs rounded-md border border-zinc-200 px-2 py-1 hover:bg-zinc-50"
+                      onClick={() => setOpen(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="text-xs rounded-md px-2 py-1 bg-brand text-white hover:bg-brand-700 disabled:opacity-50"
+                      onClick={() => {
+                        if (value.trim().length === 0) return;
+                        onAdd(value.trim());
+                        setValue("");
+                        setOpen(false);
+                      }}
+                      disabled={value.trim().length === 0}
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </Portal>
+    </>
+  );
+}
+
+function WorkingDocButton({ url }: { url?: string }) {
+  if (!url) return null;
+  const lower = url.toLowerCase();
+  const color = (() => {
+    if (lower.includes("google.com/document") || lower.endsWith(".doc") || lower.endsWith(".docx")) return "bg-blue-500 hover:bg-blue-600";
+    if (lower.includes("google.com/spreadsheets") || lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "bg-green-500 hover:bg-green-600";
+    if (lower.includes("google.com/presentation") || lower.endsWith(".ppt") || lower.endsWith(".pptx")) return "bg-amber-500 hover:bg-amber-600";
+    return "bg-slate-500 hover:bg-slate-600";
+  })();
+  const label = (() => {
+    if (lower.includes("google.com/document") || lower.endsWith(".doc") || lower.endsWith(".docx")) return "Open working doc";
+    if (lower.includes("google.com/spreadsheets") || lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "Open sheet";
+    if (lower.includes("google.com/presentation") || lower.endsWith(".ppt") || lower.endsWith(".pptx")) return "Open deck";
+    return "Open link";
+  })();
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className={`text-white text-[10px] font-medium px-2 py-0.5 rounded ${color}`}
+    >
+      {label}
+    </a>
+  );
+}
+
+// Editor kept for potential future use; not used in list items
+function WorkingDocEditor({ label, onSaved }: { label: string; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  return (
+    <>
+      <button
+        className="text-[10px] px-1.5 py-0.5 rounded border border-zinc-300 text-zinc-600 hover:bg-zinc-100"
+        onClick={() => setOpen(true)}
+      >
+        Link working doc
+      </button>
       <AnimatePresence>
         {open && (
           <>
@@ -1153,13 +1302,13 @@ function AddItemButton({ onAdd }: { onAdd: (label: string) => void }) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
             >
-              <div className="w-[min(92vw,420px)] rounded-xl border border-zinc-200 bg-white shadow-soft p-4">
-                <div className="text-sm font-medium text-zinc-800">Add checklist item</div>
+              <div className="w-[min(92vw,520px)] rounded-xl border border-zinc-200 bg-white shadow-soft p-4">
+                <div className="text-sm font-medium text-zinc-800">Add working document link</div>
                 <input
+                  className="mt-3 w-full border border-zinc-200 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                  placeholder="https://docs.google.com/... or https://..."
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
-                  placeholder="Document name"
-                  className="mt-3 w-full border border-zinc-200 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-brand/30 focus:border-brand outline-none"
                 />
                 <div className="mt-3 flex items-center justify-end gap-2">
                   <button
@@ -1170,15 +1319,23 @@ function AddItemButton({ onAdd }: { onAdd: (label: string) => void }) {
                   </button>
                   <button
                     className="text-xs rounded-md px-2 py-1 bg-brand text-white hover:bg-brand-700 disabled:opacity-50"
-                    onClick={() => {
-                      if (value.trim().length === 0) return;
-                      onAdd(value.trim());
-                      setValue("");
+                    disabled={!/^https?:\/\//i.test(value)}
+                    onClick={async () => {
+                      const norm = label
+                        .toLowerCase()
+                        .replace(/\.[a-z0-9]{1,6}$/i, "")
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/(^-|-$)+/g, "");
+                      await fetch("/api/files/associations", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ labelSlug: norm, workingUrl: value }),
+                      });
                       setOpen(false);
+                      onSaved();
                     }}
-                    disabled={value.trim().length === 0}
                   >
-                    Add
+                    Save
                   </button>
                 </div>
               </div>
@@ -1189,5 +1346,7 @@ function AddItemButton({ onAdd }: { onAdd: (label: string) => void }) {
     </>
   );
 }
+
+// WorkingSection removed from card UI per request
 
 

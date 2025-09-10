@@ -1,6 +1,5 @@
 import { auth, signOut } from "@/app/(auth)/auth";
 import Link from "next/link";
-import { History } from "./history";
 
 export const Navbar = async () => {
   let session = await auth();
@@ -8,8 +7,7 @@ export const Navbar = async () => {
   return (
     <div className="bg-gradient-to-r from-blue-600 to-blue-700 absolute top-0 left-0 w-dvw border-b border-blue-500 py-2.5 px-4 justify-between flex flex-row items-center z-30 shadow-soft">
       <div className="flex flex-row gap-3 items-center">
-        <History />
-        <div className="text-sm text-white font-bold">
+        <div className="text-xl text-white font-bold">
         Governance OS
         </div>
       </div>

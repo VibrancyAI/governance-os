@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   const perspectiveSystem = (() => {
     switch (perspective) {
-      case "founder_raising":
+      case "founder":
         return `You are an AI operating as a startup founder preparing an investor-ready data room.
 Objectives:
 - Identify missing or weak artifacts and propose concrete additions (templates/checklists acceptable)

@@ -1,5 +1,5 @@
 import { auth } from "@/app/(auth)/auth";
-import { deleteChunksByFilePath } from "@/app/db";
+import { deleteChunksByFilePath, deleteFileAssociationsByFileName } from "@/app/db";
 import { head, del } from "@vercel/blob";
 
 export async function DELETE(request: Request) {
@@ -35,6 +35,9 @@ export async function DELETE(request: Request) {
 
   await del(fileurl);
   await deleteChunksByFilePath({ filePath: pathname });
+  // Also remove any associations referencing this filename for this user
+  const fileName = pathname.replace(`${user.email}/`, "");
+  await deleteFileAssociationsByFileName({ userEmail: user.email, fileName });
 
   return Response.json({});
 }

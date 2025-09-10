@@ -14,7 +14,7 @@ import useSWR from "swr";
 import { fetcher } from "@/utils/functions";
 
 const suggestionsByPerspective: Record<string, { label: string; action: string }[]> = {
-  founder_raising: [
+  founder: [
     { label: "Audit my data room for investor readiness", action: "Audit our data room for investor readiness. List missing or weak items and a priority plan to fix them." },
     { label: "Draft use of proceeds and milestones", action: "Based on our docs, draft a clear use of proceeds and milestone plan for a Seed/Series A." },
     { label: "Tighten narrative (problem/solution/market)", action: "Write a crisp problem/solution/market narrative using our materials; call out gaps to address." },
@@ -48,8 +48,8 @@ export function Chat({
   const [isFilesVisible, setIsFilesVisible] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [perspective, setPerspective] = useState<
-    "founder_raising" | "investor_diligence" | "acquirer_mna"
-  >("founder_raising");
+    "founder" | "investor_diligence" | "acquirer_mna"
+  >("founder");
   const [hasUserDeselected, setHasUserDeselected] = useState(false);
 
   useEffect(() => {
@@ -144,8 +144,8 @@ export function Chat({
         >
           <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100/80 backdrop-blur-sm border border-slate-200/60 p-1.5 shadow-sm">
             {[
-              { key: "founder_raising", label: "Founder · Raising", color: "from-emerald-500 to-emerald-600" },
-              { key: "investor_diligence", label: "Investor", color: "from-blue-500 to-blue-600" },
+              { key: "founder", label: "Founder", color: " from-blue-500 to-blue-600" },
+              { key: "investor_diligence", label: "Investor", color: "from-emerald-500 to-emerald-600" },
               { key: "acquirer_mna", label: "Acquirer", color: "from-purple-500 to-purple-600" },
             ].map((p) => (
               <motion.button

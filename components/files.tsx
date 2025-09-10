@@ -9,7 +9,7 @@ import {
   UncheckedSquare,
   UploadIcon,
 } from "./icons";
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { fetcher } from "@/utils/functions";
 import cx from "classnames";
 import { motion } from "framer-motion";
@@ -29,6 +29,8 @@ export const Files = ({
   hasUserDeselected?: boolean;
   onUserDeselected?: () => void;
 }) => {
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => { setIsHydrated(true); }, []);
   const inputFileRef = useRef<HTMLInputElement>(null);
   const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
   const [deleteQueue, setDeleteQueue] = useState<Array<string>>([]);
@@ -61,15 +63,15 @@ export const Files = ({
       .replace(/(^-|-$)+/g, "");
   }
 
-  function getAssociations(): Record<string, string> {
-    try {
-      return JSON.parse(localStorage.getItem("data-room-associations") || "{}");
-    } catch {
-      return {};
-    }
-  }
-
-  const associations = getAssociations();
+  // Server-side associations for stable mappings across devices
+  const { data: assocRows } = useSWR<
+    Array<{ userEmail: string; labelSlug: string; fileName: string }>
+  >("/api/files/associations", fetcher, { fallbackData: [] });
+  const associations = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const row of assocRows || []) map[row.labelSlug] = row.fileName;
+    return map;
+  }, [assocRows]);
 
   const uploadedSet = new Set((files || []).map((f) => f.pathname));
 
@@ -103,6 +105,21 @@ export const Files = ({
       setSelectedFilePathnames(Array.from(have));
     }
   }, [items, selectedFilePathnames, setSelectedFilePathnames]);
+
+  if (!isHydrated) {
+    return (
+      <motion.div className="fixed bg-zinc-900/30 h-dvh w-dvw top-0 left-0 z-40 flex flex-row justify-center items-center">
+        <motion.div className="fixed p-4 flex flex-col gap-4 bg-white z-30 shadow-soft border border-zinc-200 w-[680px] h-[480px] rounded-xl">
+          <div className="h-6 w-40 bg-zinc-200 rounded animate-pulse" />
+          <div className="flex-1 space-y-2">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-8 bg-zinc-100 rounded animate-pulse" />
+            ))}
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

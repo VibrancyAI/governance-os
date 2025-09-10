@@ -7,6 +7,7 @@ import {
   real,
   timestamp,
   json,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("User", {
@@ -30,8 +31,26 @@ export const chunk = pgTable("Chunk", {
   embedding: real("embedding").array().notNull(),
 });
 
+export const fileAssociation = pgTable(
+  "FileAssociation",
+  {
+    userEmail: varchar("userEmail", { length: 64 })
+      .notNull()
+      .references(() => user.email),
+    labelSlug: text("labelSlug").notNull(),
+    fileName: text("fileName"),
+    workingUrl: text("workingUrl"),
+  },
+  (table) => {
+    return {
+      pk: primaryKey({ columns: [table.userEmail, table.labelSlug] }),
+    };
+  },
+);
+
 export type Chat = Omit<InferSelectModel<typeof chat>, "messages"> & {
   messages: Array<Message>;
 };
 
 export type Chunk = InferSelectModel<typeof chunk>;
+export type FileAssociation = InferSelectModel<typeof fileAssociation>;

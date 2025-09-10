@@ -8,6 +8,20 @@
       "when": 1726832743574,
       "tag": "0000_pretty_dracula",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1726900000000,
+      "tag": "0001_file_association",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1726900001000,
+      "tag": "0002_file_association_working_url",
+      "breakpoints": true
     }
   ]
 }

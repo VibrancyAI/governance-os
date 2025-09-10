@@ -1,8 +1,8 @@
 import { drizzle } from "drizzle-orm/postgres-js";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import postgres from "postgres";
 import { genSaltSync, hashSync } from "bcrypt-ts";
-import { chat, chunk, user } from "@/schema";
+import { chat, chunk, user, fileAssociation } from "@/schema";
 
 // Optionally, if not using email/pass login, you can
 // use the Drizzle adapter for Auth.js / NextAuth
@@ -88,4 +88,93 @@ export async function deleteChunksByFilePath({
   filePath: string;
 }) {
   return await db.delete(chunk).where(eq(chunk.filePath, filePath));
+}
+
+export async function getFileAssociationsByUser({
+  email,
+}: {
+  email: string;
+}) {
+  return await db
+    .select()
+    .from(fileAssociation)
+    .where(eq(fileAssociation.userEmail, email));
+}
+
+export async function upsertFileAssociation({
+  userEmail,
+  labelSlug,
+  fileName,
+  workingUrl,
+}: {
+  userEmail: string;
+  labelSlug: string;
+  fileName?: string;
+  workingUrl?: string;
+}) {
+  const existing = await db
+    .select()
+    .from(fileAssociation)
+    .where(
+      and(
+        eq(fileAssociation.userEmail, userEmail),
+        eq(fileAssociation.labelSlug, labelSlug),
+      ),
+    );
+  if (existing.length > 0) {
+    return await db
+      .update(fileAssociation)
+      .set({ fileName: fileName ?? existing[0].fileName, workingUrl: workingUrl ?? existing[0].workingUrl })
+      .where(
+        and(
+          eq(fileAssociation.userEmail, userEmail),
+          eq(fileAssociation.labelSlug, labelSlug),
+        ),
+      );
+  }
+  return await db.insert(fileAssociation).values({ userEmail, labelSlug, fileName: fileName ?? null as any, workingUrl: workingUrl ?? null as any });
+}
+
+export async function deleteFileAssociation({
+  userEmail,
+  labelSlug,
+}: {
+  userEmail: string;
+  labelSlug: string;
+}) {
+  return await db
+    .delete(fileAssociation)
+    .where(
+      and(
+        eq(fileAssociation.userEmail, userEmail),
+        eq(fileAssociation.labelSlug, labelSlug),
+      ),
+    );
+}
+
+export async function deleteFileAssociationsByFileName({
+  userEmail,
+  fileName,
+}: {
+  userEmail: string;
+  fileName: string;
+}) {
+  return await db
+    .delete(fileAssociation)
+    .where(
+      and(
+        eq(fileAssociation.userEmail, userEmail),
+        eq(fileAssociation.fileName, fileName),
+      ),
+    );
+}
+
+export async function deleteAllFileAssociations({
+  userEmail,
+}: {
+  userEmail: string;
+}) {
+  return await db
+    .delete(fileAssociation)
+    .where(eq(fileAssociation.userEmail, userEmail));
 }
