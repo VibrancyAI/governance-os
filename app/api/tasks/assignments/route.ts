@@ -1,5 +1,5 @@
 import { auth } from "@/app/(auth)/auth";
-import { getAssignments, setAssignment, getOrgMembers } from "@/app/db";
+import { getAssignments, setAssignment, getOrgMembers, deleteAssignment } from "@/app/db";
 import { getCurrentOrgIdOrSetDefault } from "@/app/api/orgs/_utils";
 
 export async function GET() {
@@ -30,8 +30,9 @@ export async function DELETE(request: Request) {
   const orgId = await getCurrentOrgIdOrSetDefault(session.user.email);
   const { searchParams } = new URL(request.url);
   const labelSlug = searchParams.get("labelSlug");
+  const assigneeEmail = searchParams.get("assigneeEmail") || undefined;
   if (!labelSlug) return new Response("Missing labelSlug", { status: 400 });
-  await setAssignment({ orgId, labelSlug, assigneeEmail: null, assignedByEmail: session.user.email });
+  await deleteAssignment({ orgId, labelSlug, assigneeEmail: assigneeEmail || undefined });
   return Response.json({ ok: true });
 }
 

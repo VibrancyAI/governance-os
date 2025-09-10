@@ -1,12 +1,18 @@
 import { auth } from "@/app/(auth)/auth";
-import { createOrganizationForUser, listOrganizationsForUser, getMembership, deleteOrganizationCascade } from "@/app/db";
+import { createOrganizationForUser, listOrganizationsForUser, getMembership, deleteOrganizationCascade, getOrganizationById } from "@/app/db";
 import { cookies } from "next/headers";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user?.email) return new Response("Unauthorized", { status: 401 });
   const email = session.user.email;
-  const orgs = await listOrganizationsForUser(email);
+  const memberships = await listOrganizationsForUser(email);
+  const orgs = await Promise.all(
+    memberships.map(async (m: any) => {
+      const org = await getOrganizationById({ orgId: m.orgId });
+      return { orgId: m.orgId, role: m.role, name: org?.name || null, logoUrl: (org as any)?.logoUrl || null };
+    }),
+  );
   const current = cookies().get("orgId")?.value || null;
   return Response.json({ orgs, currentOrgId: current });
 }

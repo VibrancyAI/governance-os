@@ -265,24 +265,18 @@ export async function getAssignments({ orgId }: { orgId: string }) {
 }
 export async function setAssignment({ orgId, labelSlug, assigneeEmail, assignedByEmail }: { orgId: string; labelSlug: string; assigneeEmail: string | null; assignedByEmail: string }) {
   const now = new Date();
-  const existing = await db
-    .select()
-    .from(itemAssignment)
-    .where(and(eq(itemAssignment.orgId, orgId), eq(itemAssignment.labelSlug, labelSlug)));
   if (!assigneeEmail) {
-    if (existing.length) {
-      await db.delete(itemAssignment).where(and(eq(itemAssignment.orgId, orgId), eq(itemAssignment.labelSlug, labelSlug)));
-    }
+    // no-op for multi-assignment removal: handled via deleteAssignment
     return;
   }
-  if (existing.length > 0) {
-    await db
-      .update(itemAssignment)
-      .set({ assigneeEmail, assignedByEmail, assignedAt: now })
-      .where(and(eq(itemAssignment.orgId, orgId), eq(itemAssignment.labelSlug, labelSlug)));
-  } else {
-    await db.insert(itemAssignment).values({ orgId, labelSlug, assigneeEmail, assignedByEmail, assignedAt: now });
+  await db.insert(itemAssignment).values({ orgId, labelSlug, assigneeEmail, assignedByEmail, assignedAt: now });
+}
+
+export async function deleteAssignment({ orgId, labelSlug, assigneeEmail }: { orgId: string; labelSlug: string; assigneeEmail?: string }) {
+  if (assigneeEmail) {
+    return await db.delete(itemAssignment).where(and(eq(itemAssignment.orgId, orgId), eq(itemAssignment.labelSlug, labelSlug), eq(itemAssignment.assigneeEmail, assigneeEmail)));
   }
+  return await db.delete(itemAssignment).where(and(eq(itemAssignment.orgId, orgId), eq(itemAssignment.labelSlug, labelSlug)));
 }
 
 // Danger: destructive
@@ -324,4 +318,9 @@ export async function getUserProfilesByEmails({ emails }: { emails: string[] }) 
   if (emails.length === 0) return [] as Array<{ email: string; displayName: string | null; avatarUrl: string | null }>;
   // Drizzle doesn't support IN on varchar without helper; use inArray on userProfile.email
   return await db.select().from(userProfile).where(inArray(userProfile.email, emails as any));
+}
+
+export async function getOrganizationById({ orgId }: { orgId: string }) {
+  const rows = await db.select().from(organization).where(eq(organization.id, orgId));
+  return rows[0] || null;
 }

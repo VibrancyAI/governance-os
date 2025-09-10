@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-type OrgRow = { orgId: string; role: string };
+type OrgRow = { orgId: string; role: string; name?: string | null };
 
 export default function OrgSwitcher() {
   const [orgs, setOrgs] = useState<OrgRow[]>([]);
@@ -13,7 +13,7 @@ export default function OrgSwitcher() {
       try {
         const res = await fetch("/api/orgs", { cache: "no-store" });
         const data = await res.json();
-        const rows = (data.orgs || []).map((r: any) => ({ orgId: r.orgId, role: r.role }));
+        const rows = (data.orgs || []).map((r: any) => ({ orgId: r.orgId, role: r.role, name: r.name || null }));
         setOrgs(rows);
         setCurrent(data.currentOrgId || (rows[0]?.orgId ?? null));
       } catch {}
@@ -58,9 +58,9 @@ export default function OrgSwitcher() {
       disabled={busy}
       className="text-xs bg-white/10 text-blue-50 border border-blue-400/40 rounded-md px-2 py-1 outline-none hover:bg-white/15"
     >
-      {orgs.map((o) => (
+      {orgs.map((o: any) => (
         <option key={o.orgId} value={o.orgId} className="text-black">
-          {o.orgId.slice(0, 8)}… ({o.role})
+          {(o.name || "").toString().trim() || `${o.orgId.slice(0, 8)}…`} ({o.role})
         </option>
       ))}
       <option value="__new__" className="text-black">+ Create new…</option>

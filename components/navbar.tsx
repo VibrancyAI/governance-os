@@ -4,6 +4,10 @@ import { listOrganizationsForUser, getMembership, getOrgMembers, getUserProfiles
 import { cookies } from "next/headers";
 import InviteDialog from "./org-invite-dialog";
 import OrgSwitcher from "./org-switcher";
+import DeleteOrgButton from "./delete-org-button";
+import ProfileModalButton from "./profile-modal-button";
+import OrgSettingsModalButton from "./org-settings-modal-button";
+import CurrentOrgName from "./current-org-name";
 
 export const Navbar = async () => {
   let session = await auth();
@@ -21,52 +25,23 @@ export const Navbar = async () => {
   const memberEmails = members.map((m: any) => m.userEmail);
   const profiles = memberEmails.length > 0 ? await getUserProfilesByEmails({ emails: memberEmails }) : [];
   const emailToProfile = new Map(profiles.map((p: any) => [p.email, p]));
-
-  async function switchOrg(formData: FormData) {
-    "use server";
-    const orgId = formData.get("orgId") as string;
-    if (!email || !orgId) return;
-    if (orgId === "__new__") {
-      const name = `Org ${Date.now()}`;
-      const res = await fetch(`${process.env.APP_URL || "http://localhost:3000"}/api/orgs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-        cache: "no-store",
-      });
-      return;
-    }
-    const m = await getMembership({ orgId, email });
-    if (!m) return;
-    cookies().set("orgId", orgId, { httpOnly: true, sameSite: "lax", path: "/" });
-  }
+  const isOwner = currentOrgId && email ? ((await getMembership({ orgId: currentOrgId, email }))?.role === "owner") : false;
 
   return (
     <div className="bg-gradient-to-r from-blue-600 to-blue-700 absolute top-0 left-0 w-dvw border-b border-blue-500 py-2.5 px-4 justify-between flex flex-row items-center z-30 shadow-soft">
       <div className="flex flex-row gap-3 items-center">
         <div className="text-sm text-white font-bold">Governance OS</div>
-        {email && <OrgSwitcher />}
+        {email && (
+          <div className="flex items-center gap-2">
+            <CurrentOrgName />
+            <OrgSwitcher />
+          </div>
+        )}
       </div>
 
       {session ? (
         <div className="flex items-center gap-3">
           {email && <InviteDialog />}
-          {email && currentOrgId && (
-            <form action={async () => {
-              "use server";
-              // delete current org if owner
-              const m = await getMembership({ orgId: currentOrgId!, email: email! });
-              if (!m || m.role !== "owner") return;
-              await fetch(`${process.env.APP_URL || "http://localhost:3000"}/api/orgs`, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orgId: currentOrgId }),
-                cache: "no-store",
-              });
-            }}>
-              <button type="submit" className="text-xs rounded-md bg-white/10 text-red-100 hover:bg-white/20 border border-red-400/40 px-2 py-1">Delete org</button>
-            </form>
-          )}
 
           {/* Stacked member avatars */}
           <div className="flex -space-x-2 mr-1">
@@ -83,24 +58,32 @@ export const Navbar = async () => {
             })}
           </div>
 
+          <DeleteOrgButton currentOrgId={currentOrgId} userEmail={email} />
+
           <div className="group py-1.5 px-2.5 rounded-md hover:bg-blue-500 cursor-pointer relative border border-transparent hover:border-blue-400 transition-colors">
           <div className="text-sm text-blue-100 hover:text-white z-10">
             {session.user?.email}
           </div>
           <div className="flex-col absolute top-6 right-0 w-full pt-5 group-hover:flex hidden">
-            <form
+            <div className="flex flex-col gap-1 bg-white rounded-md border border-zinc-200 p-1 shadow-soft">
+              <ProfileModalButton />
+              {isOwner && (
+                <OrgSettingsModalButton />
+              )}
+              <form
               action={async () => {
                 "use server";
                 await signOut();
               }}
-            >
-              <button
-                type="submit"
-                className="text-sm w-full p-1.5 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-700"
               >
-                Sign out
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="text-sm w-full p-1.5 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-700"
+                >
+                  Sign out
+                </button>
+              </form>
+            </div>
           </div>
           </div>
         </div>
@@ -115,3 +98,4 @@ export const Navbar = async () => {
     </div>
   );
 };
+

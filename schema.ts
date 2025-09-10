@@ -113,7 +113,7 @@ export const itemAssignment = pgTable(
   {
     orgId: text("orgId").notNull().references(() => organization.id),
     labelSlug: text("labelSlug").notNull(),
-    assigneeEmail: varchar("assigneeEmail", { length: 64 }).references(() => user.email),
+    assigneeEmail: varchar("assigneeEmail", { length: 64 }).notNull().references(() => user.email),
     assignedByEmail: varchar("assignedByEmail", { length: 64 })
       .notNull()
       .references(() => user.email),
@@ -121,7 +121,7 @@ export const itemAssignment = pgTable(
   },
   (table) => {
     return {
-      pk: primaryKey({ columns: [table.orgId, table.labelSlug] }),
+      pk: primaryKey({ columns: [table.orgId, table.labelSlug, table.assigneeEmail] }),
     };
   },
 );

@@ -38,10 +38,29 @@ export function DataRoom() {
   }, [assocRows]);
   const { data: members } = useSWR<Array<{ orgId: string; userEmail: string; role: string }>>("/api/orgs/members", fetcher, { fallbackData: [] });
   const { data: assignments, mutate: mutateAssignments } = useSWR<Array<{ orgId: string; labelSlug: string; assigneeEmail?: string }>>("/api/tasks/assignments", fetcher, { fallbackData: [] });
-  const assigneeMap = useMemo(() => {
-    const m: Record<string, string | undefined> = {};
-    for (const a of assignments || []) m[a.labelSlug] = a.assigneeEmail || undefined;
-    return m;
+  const { data: profileRows } = useSWR<Array<{ email: string; displayName?: string; avatarUrl?: string }>>(
+    () => {
+      const emails = Array.from(new Set((assignments || []).map((a) => a.assigneeEmail).filter(Boolean) as string[]));
+      if (emails.length === 0) return null;
+      const qs = encodeURIComponent(emails.join(","));
+      return `/api/profiles?emails=${qs}`;
+    },
+    fetcher,
+    { fallbackData: [] },
+  );
+  const profilesByEmail = useMemo(() => {
+    const obj: Record<string, { avatarUrl?: string; displayName?: string }> = {};
+    for (const p of profileRows || []) obj[p.email] = { avatarUrl: p.avatarUrl, displayName: p.displayName } as any;
+    return obj;
+  }, [profileRows]);
+  const assigneesByLabel = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const a of assignments || []) {
+      const list = map.get(a.labelSlug) || [];
+      if (a.assigneeEmail) list.push(a.assigneeEmail);
+      map.set(a.labelSlug, list);
+    }
+    return map;
   }, [assignments]);
   function getInitials(email?: string) {
     if (!email) return "?";
@@ -321,7 +340,7 @@ export function DataRoom() {
                   isCustom={(custom.added[section.category] || []).includes(doc)}
                   onRefetch={() => mutate()}
                   onAssocChanged={() => mutateAssoc()}
-                  assignedToEmail={assigneeMap[normalize(doc)]}
+                  assignedEmails={assigneesByLabel.get(normalize(doc)) || []}
                   onAssign={async (email) => {
                     const norm = normalize(doc);
                     await fetch("/api/tasks/assignments", {
@@ -331,7 +350,13 @@ export function DataRoom() {
                     });
                     mutateAssignments();
                   }}
+                  onUnassign={async (email) => {
+                    const norm = normalize(doc);
+                    await fetch(`/api/tasks/assignments?labelSlug=${encodeURIComponent(norm)}&assigneeEmail=${encodeURIComponent(email)}`, { method: "DELETE" });
+                    mutateAssignments();
+                  }}
                   members={members || []}
+                  profilesByEmail={profilesByEmail}
                 />)
               )}
             </ul>
@@ -434,9 +459,11 @@ function DataRoomItem({
   isCustom,
   onRefetch,
   onAssocChanged,
-  assignedToEmail,
+  assignedEmails,
   onAssign,
+  onUnassign,
   members,
+  profilesByEmail,
 }: {
   label: string;
   isUploaded: boolean;
@@ -450,9 +477,11 @@ function DataRoomItem({
   isCustom: boolean;
   onRefetch: () => void;
   onAssocChanged: () => void;
-  assignedToEmail?: string;
-  onAssign: (email: string | null) => Promise<void>;
+  assignedEmails: string[];
+  onAssign: (email: string) => Promise<void>;
+  onUnassign: (email: string) => Promise<void>;
   members: Array<{ userEmail: string; role: string }>;
+  profilesByEmail: Record<string, { avatarUrl?: string; displayName?: string }>;
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -501,22 +530,27 @@ function DataRoomItem({
                 >
                   {label}
                 </span>
-                <div className="relative">
+                <div className="relative flex -space-x-2">
+                  {(assignedEmails || []).slice(0,3).map((em) => {
+                    const p = profilesByEmail[em] as any;
+                    const label = p?.displayName || em.split("@")[0];
+                    const initials = label.split(/[\s._-]/).filter(Boolean).slice(0,2).map((s: string) => s[0]?.toUpperCase() || "").join("") || label.slice(0,2).toUpperCase();
+                    const url = p?.avatarUrl as string | undefined;
+                    return (
+                      <div key={em} className="w-5 h-5 rounded-full bg-zinc-200 text-[9px] font-semibold text-zinc-700 flex items-center justify-center hover:ring-2 hover:ring-zinc-300 border border-white overflow-hidden">
+                        {url ? (<img src={url} alt={label} className="w-full h-full object-cover" />) : initials}
+                      </div>
+                    );
+                  })}
                   <button
-                    className="w-5 h-5 rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700 flex items-center justify-center hover:ring-2 hover:ring-zinc-300"
-                    title={assignedToEmail || "Unassigned"}
+                    className="w-5 h-5 rounded-full bg-zinc-100 text-[11px] font-semibold text-zinc-500 flex items-center justify-center hover:ring-2 hover:ring-zinc-300 border border-white"
+                    title="Assign"
                     onClick={(e) => {
                       e.preventDefault();
                       setShowDropdown(!showDropdown);
                     }}
                   >
-                    {(function(){
-                      if (!assignedToEmail) return "?";
-                      const name = assignedToEmail.split("@")[0];
-                      const parts = name.split(/[._-]/).filter(Boolean);
-                      const letters = (parts[0]?.[0] || "") + (parts[1]?.[0] || "");
-                      return (letters || name.slice(0, 2)).toUpperCase();
-                    })()}
+                    +
                   </button>
                 </div>
                 {isCustom && (
@@ -554,22 +588,26 @@ function DataRoomItem({
                 >
                   {label}
                 </span>
-                <div className="relative">
+                <div className="relative flex -space-x-2">
+                  {(assignedEmails || []).slice(0,3).map((em) => (
+                    <div key={em} className="w-5 h-5 rounded-full bg-zinc-200 text-[9px] font-semibold text-zinc-700 flex items-center justify-center hover:ring-2 hover:ring-zinc-300 border border-white">
+                      {(function(){
+                        const name = em.split("@")[0];
+                        const parts = name.split(/[._-]/).filter(Boolean);
+                        const letters = (parts[0]?.[0] || "") + (parts[1]?.[0] || "");
+                        return (letters || name.slice(0, 2)).toUpperCase();
+                      })()}
+                    </div>
+                  ))}
                   <button
-                    className="w-5 h-5 rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700 flex items-center justify-center hover:ring-2 hover:ring-zinc-300"
-                    title={assignedToEmail || "Unassigned"}
+                    className="w-5 h-5 rounded-full bg-zinc-100 text-[11px] font-semibold text-zinc-500 flex items-center justify-center hover:ring-2 hover:ring-zinc-300 border border-white"
+                    title="Assign"
                     onClick={(e) => {
                       e.preventDefault();
                       setShowDropdown(!showDropdown);
                     }}
                   >
-                    {(function(){
-                      if (!assignedToEmail) return "?";
-                      const name = assignedToEmail.split("@")[0];
-                      const parts = name.split(/[._-]/).filter(Boolean);
-                      const letters = (parts[0]?.[0] || "") + (parts[1]?.[0] || "");
-                      return (letters || name.slice(0, 2)).toUpperCase();
-                    })()}
+                    +
                   </button>
                 </div>
                 {isCustom && (
@@ -630,13 +668,16 @@ function DataRoomItem({
                 
                 <div className="absolute right-0 top-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg py-1 z-20 min-w-40">
                   <div className="px-3 py-1.5 text-[11px] text-zinc-500">Assign to</div>
+                  {(assignedEmails || []).map((em) => (
+                    <button key={em} onClick={(e) => { e.stopPropagation(); onUnassign(em); setShowDropdown(false); }} className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50">Unassign {em}</button>
+                  ))}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onAssign(null);
+                      // noop for multi assign
                       setShowDropdown(false);
                     }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                    className="hidden"
                   >
                     Unassigned
                   </button>
