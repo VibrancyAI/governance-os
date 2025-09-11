@@ -1,5 +1,5 @@
 import { auth } from "@/app/(auth)/auth";
-import { insertChunks, deleteChunksByFilePath } from "@/app/db";
+import { insertChunks, deleteChunksByFilePath, getMembership } from "@/app/db";
 import { extractTextFromUrl } from "@/utils/extract";
 import { openai } from "@ai-sdk/openai";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
@@ -27,6 +27,10 @@ export async function POST(request: Request) {
   }
 
   const orgId = await getCurrentOrgIdOrSetDefault(user.email!);
+  const membership = await getMembership({ orgId, email: user.email! });
+  if (!membership || !["owner", "operator"].includes(membership.role)) {
+    return new Response("Forbidden", { status: 403 });
+  }
   const { downloadUrl } = await put(`${orgId}/${filename}`, request.body, {
     access: "public",
   });
@@ -42,29 +46,16 @@ export async function POST(request: Request) {
     values: chunkedContent.map((chunk) => chunk.pageContent),
   });
 
-  // Upsert semantics: try insert; on conflict replace content/embedding
-  try {
-    await insertChunks({
-      chunks: chunkedContent.map((chunk, i) => ({
-        id: `${orgId}/${filename}/${i}`,
-        filePath: `${orgId}/${filename}`,
-        content: chunk.pageContent,
-        embedding: embeddings[i],
-      })),
-    });
-  } catch (e) {
-    // Best-effort overwrite: delete old chunks for this file then reinsert
-    // This avoids unique constraint violations when replacing files
-    await deleteChunksByFilePath({ filePath: `${orgId}/${filename}` });
-    await insertChunks({
-      chunks: chunkedContent.map((chunk, i) => ({
-        id: `${orgId}/${filename}/${i}`,
-        filePath: `${orgId}/${filename}`,
-        content: chunk.pageContent,
-        embedding: embeddings[i],
-      })),
-    });
-  }
+  // Overwrite semantics: delete then insert to avoid stale chunks/conflicts
+  await deleteChunksByFilePath({ filePath: `${orgId}/${filename}` });
+  await insertChunks({
+    chunks: chunkedContent.map((chunk, i) => ({
+      id: `${orgId}/${filename}/${i}`,
+      filePath: `${orgId}/${filename}`,
+      content: chunk.pageContent,
+      embedding: embeddings[i],
+    })),
+  });
 
   return Response.json({});
 }

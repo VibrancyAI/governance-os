@@ -40,14 +40,22 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, sent: false, token });
   }
 
-  await resend.emails.send({
-    from: process.env.RESEND_FROM || "onboarding@resend.dev",
-    to: email,
-    subject: `You're invited to ${orgId}`,
-    react: InviteEmail({ orgName: orgId, inviterEmail: session.user.email, acceptUrl, role }),
-  });
-
-  return Response.json({ ok: true });
+  try {
+    const { error } = await resend.emails.send({
+      from: process.env.RESEND_FROM || "Acme <onboarding@resend.dev>",
+      to: email,
+      subject: `You're invited to ${orgId}`,
+      react: InviteEmail({ orgName: orgId, inviterEmail: session.user.email, acceptUrl, role }),
+    });
+    if (error) {
+      console.error("Resend send error", error);
+      return Response.json({ ok: true, sent: false, error: error.message || "send_failed", status: (error as any).statusCode });
+    }
+    return Response.json({ ok: true, sent: true });
+  } catch (e: any) {
+    console.error("Resend send exception", e);
+    return Response.json({ ok: true, sent: false, error: e?.message || "send_failed" });
+  }
 }
 
 

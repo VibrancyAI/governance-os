@@ -1,5 +1,5 @@
 import { auth } from "@/app/(auth)/auth";
-import { deleteChunksByFilePath, deleteFileAssociationsByFileName } from "@/app/db";
+import { deleteChunksByFilePath, deleteFileAssociationsByFileName, getMembership } from "@/app/db";
 import { head, del } from "@vercel/blob";
 import { getCurrentOrgIdOrSetDefault } from "@/app/api/orgs/_utils";
 
@@ -29,6 +29,10 @@ export async function DELETE(request: Request) {
 
   const { pathname } = await head(fileurl);
   const orgId = await getCurrentOrgIdOrSetDefault(user.email);
+  const membership = await getMembership({ orgId, email: user.email });
+  if (!membership || !["owner", "operator"].includes(membership.role)) {
+    return new Response("Forbidden", { status: 403 });
+  }
   if (!pathname.startsWith(orgId)) {
     return new Response("Unauthorized", { status: 400 });
   }
