@@ -15,6 +15,17 @@ export function ChatWidget() {
   const [id, setId] = useState<string>("");
   const [seedMessages, setSeedMessages] = useState<Array<Message>>([]);
   const [activeTab, setActiveTab] = useState<"chat" | "history">("chat");
+  // Persist chat state across open/close
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("chat-widget-state");
+      if (saved) {
+        const obj = JSON.parse(saved);
+        if (obj?.id) setId(obj.id);
+        if (Array.isArray(obj?.messages)) setSeedMessages(obj.messages);
+      }
+    } catch {}
+  }, []);
 
   const { data: history, isLoading, error, mutate } = useSWR<Array<ChatRow>>(isOpen ? "/api/history" : null, fetcher, { fallbackData: [] });
 
@@ -56,14 +67,29 @@ export function ChatWidget() {
                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                     <div className="text-sm font-semibold text-slate-800">AI Assistant</div>
                   </div>
-                  <motion.button
-                    className="text-slate-500 hover:text-slate-700 text-sm px-2 py-1 rounded-md hover:bg-slate-100 transition-colors"
-                    onClick={() => setIsOpen(false)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    ✕
-                  </motion.button>
+                  <div className="flex items-center gap-2">
+                    <motion.button
+                      className="text-xs px-3 py-1.5 rounded-md border border-slate-200 bg-white/80 hover:bg-white text-slate-700"
+                      onClick={() => {
+                        const newId = generateId();
+                        setId(newId);
+                        setSeedMessages([]);
+                        setActiveTab("chat");
+                      }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      New chat
+                    </motion.button>
+                    <motion.button
+                      className="text-slate-500 hover:text-slate-700 text-sm px-2 py-1 rounded-md hover:bg-slate-100 transition-colors"
+                      onClick={() => setIsOpen(false)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      ✕
+                    </motion.button>
+                  </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <button
@@ -82,7 +108,19 @@ export function ChatWidget() {
               </motion.div>
               <div className="flex-1 min-h-0">
                 {activeTab === "chat" ? (
-                  <Chat key={id} id={id} initialMessages={seedMessages} session={null} isWidget />
+                  <Chat
+                    key={id}
+                    id={id}
+                    initialMessages={seedMessages}
+                    session={null}
+                    isWidget
+                    onMessagesChange={(msgs) => {
+                      try {
+                        setSeedMessages(msgs);
+                        localStorage.setItem("chat-widget-state", JSON.stringify({ id, messages: msgs }));
+                      } catch {}
+                    }}
+                  />
                 ) : (
                   <div className="h-full overflow-y-auto p-3">
                     {error && (

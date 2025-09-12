@@ -2,17 +2,49 @@
 
 import { motion } from "framer-motion";
 import { BotIcon, UserIcon } from "./icons";
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import { Markdown } from "./markdown";
+import { ActionMessage } from "@/components/action-message";
 
 export const Message = ({
   role,
   content,
+  onAction,
+  showActions = true,
 }: {
   role: string;
   content: string | ReactNode;
+  onAction?: (a: { type: string; slug?: string; text?: string }) => void;
+  showActions?: boolean;
 }) => {
   const isAssistant = role === "assistant";
+  const raw = String(content || "");
+
+  function sanitize(text: string): string {
+    let out = text;
+    out = out.replace(/```ui-json[\s\S]*?```/gi, "");
+    out = out.replace(/```json[\s\S]*?```/gi, "");
+    out = out.replace(/```ui-json[\s\S]*$/gi, "");
+    out = out.replace(/```json[\s\S]*$/gi, "");
+    out = out.replace(/```[\s\S]*?```/g, (block) => {
+      const inner = block.replace(/^```[a-zA-Z-]*\n?/, "").replace(/```$/, "").trim();
+      if (inner.startsWith("{") && (/"suggestedActions"/.test(inner) || /"view"/.test(inner))) return "";
+      return block;
+    });
+    out = out.replace(/```[a-zA-Z-]*?[\s\S]*$/g, (block) => {
+      const inner = block.replace(/^```[a-zA-Z-]*\n?/, "").trim();
+      if (inner.startsWith("{") && inner.length < 50000) return "";
+      return block;
+    });
+    out = out.replace(/(^|\n)\s*ui\s*\{[\s\S]*$/i, "");
+    return out.trim();
+  }
+
+  const sanitized = useMemo(() => sanitize(raw), [raw]);
+  const hasActions = useMemo(() => /```ui-json|"suggestedActions"/i.test(raw), [raw]);
+  if (isAssistant && sanitized.length === 0 && !hasActions) {
+    return null;
+  }
   
   return (
     <motion.div
@@ -45,7 +77,17 @@ export const Message = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.05 }}
         >
-          <Markdown>{content as string}</Markdown>
+          {(() => {
+            // Strip standalone markdown bullets to avoid stray lines between item cards
+            const cleaned = sanitized.replace(/^\s*[-*]\s+.*$/gm, "").trim();
+            return <Markdown>{cleaned}</Markdown>;
+          })()}
+          {isAssistant && onAction && showActions ? (
+            <ActionMessage
+              content={String(content || "")}
+              onAction={(a) => onAction(a)}
+            />
+          ) : null}
         </motion.div>
       </div>
     </motion.div>

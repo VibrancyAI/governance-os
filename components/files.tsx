@@ -55,12 +55,27 @@ export const Files = ({
     setIsFilesVisible(false);
   });
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setIsFilesVisible(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setIsFilesVisible]);
+
   function normalize(name: string): string {
     return name
       .toLowerCase()
       .replace(/\.[a-z0-9]{1,6}$/i, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)+/g, "");
+  }
+  // Additional synonyms to improve matching (e.g., PRD vs Product Roadmap)
+  function synonyms(normalizedLabel: string): string[] {
+    const list = [normalizedLabel];
+    if (normalizedLabel.includes("product-roadmap")) list.push("roadmap", "prd", "product-requirements", "product-requirements-doc", "product-requirements-document");
+    if (normalizedLabel.includes("cap-table")) list.push("captable", "cap-table-history");
+    return list;
   }
 
   // Server-side associations for stable mappings across devices
@@ -80,11 +95,18 @@ export const Files = ({
     .map((label) => {
       const norm = normalize(label);
       const assoc = associations[norm];
-      const matched =
-        assoc && uploadedSet.has(assoc)
-          ? assoc
-          : (files || [])
-              .find((f) => normalize(f.pathname).includes(norm))?.pathname;
+      // try association -> fuzzy -> synonym fuzzy
+      let matched = assoc && uploadedSet.has(assoc) ? assoc : undefined;
+      if (!matched) {
+        matched = (files || []).find((f) => normalize(f.pathname).includes(norm))?.pathname;
+      }
+      if (!matched) {
+        const syns = synonyms(norm);
+        matched = (files || []).find((f) => {
+          const nf = normalize(f.pathname);
+          return syns.some((s) => nf.includes(s));
+        })?.pathname;
+      }
       return { label, fileName: matched || null };
     });
 
@@ -153,42 +175,51 @@ export const Files = ({
             <div className="text-zinc-900">Select items to include</div>
           </div>
 
-          <input
-            name="file"
-            ref={inputFileRef}
-            type="file"
-            required
-            className="opacity-0 pointer-events-none w-1"
-            accept=".pdf,.docx,.txt,.md,.markdown,.html,.htm,.csv,.json,.png,.jpg,.jpeg,.webp,.gif,.tif,.tiff,.bmp"
-            multiple={false}
-            onChange={async (event) => {
-              const file = event.target.files![0];
+          <div className="flex flex-row items-center gap-2">
+            <input
+              name="file"
+              ref={inputFileRef}
+              type="file"
+              required
+              className="opacity-0 pointer-events-none w-1"
+              accept=".pdf,.docx,.txt,.md,.markdown,.html,.htm,.csv,.json,.png,.jpg,.jpeg,.webp,.gif,.tif,.tiff,.bmp"
+              multiple={false}
+              onChange={async (event) => {
+                const file = event.target.files![0];
 
-              if (file) {
-                setUploadQueue((currentQueue) => [...currentQueue, file.name]);
+                if (file) {
+                  setUploadQueue((currentQueue) => [...currentQueue, file.name]);
 
-                await fetch(`/api/files/upload?filename=${file.name}`, {
-                  method: "POST",
-                  body: file,
-                });
+                  await fetch(`/api/files/upload?filename=${file.name}`, {
+                    method: "POST",
+                    body: file,
+                  });
 
-                setUploadQueue((currentQueue) =>
-                  currentQueue.filter((filename) => filename !== file.name),
-                );
+                  setUploadQueue((currentQueue) =>
+                    currentQueue.filter((filename) => filename !== file.name),
+                  );
 
-                mutate([...(files || []), { pathname: file.name }]);
-              }
-            }}
-          />
+                  mutate([...(files || []), { pathname: file.name }]);
+                }
+              }}
+            />
 
-          <div
-            className="bg-brand text-white hover:bg-brand-700 flex flex-row gap-2 items-center text-sm rounded-md p-1.5 px-3 cursor-pointer shadow-soft"
-            onClick={() => {
-              inputFileRef.current?.click();
-            }}
-          >
-            <UploadIcon />
-            <div>Upload a file</div>
+            <div
+              className="bg-brand text-white hover:bg-brand-700 flex flex-row gap-2 items-center text-sm rounded-md p-1.5 px-3 cursor-pointer shadow-soft"
+              onClick={() => {
+                inputFileRef.current?.click();
+              }}
+            >
+              <UploadIcon />
+              <div>Upload a file</div>
+            </div>
+
+            <button
+              className="text-xs rounded-md border border-zinc-200 px-2 py-1.5 text-zinc-700 hover:bg-zinc-50"
+              onClick={() => setIsFilesVisible(false)}
+            >
+              Close
+            </button>
           </div>
         </div>
 

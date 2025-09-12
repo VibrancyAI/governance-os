@@ -26,25 +26,26 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
         </code>
       );
     },
+    // Disable list markers in chat to avoid bullet lines between item cards
     ol: ({ node, children, ...props }: any) => {
       return (
-        <ol className="list-decimal list-outside ml-6 space-y-1.5 marker:text-blue-500 marker:font-medium my-3" {...props}>
+        <div className="space-y-1.5 my-3" {...props}>
           {children}
-        </ol>
+        </div>
       );
     },
     li: ({ node, children, ...props }: any) => {
       return (
-        <li className="pl-1 leading-relaxed" {...props}>
+        <div className="pl-0 leading-relaxed" {...props}>
           {children}
-        </li>
+        </div>
       );
     },
     ul: ({ node, children, ...props }: any) => {
       return (
-        <ul className="list-disc list-outside ml-6 space-y-1.5 marker:text-blue-500 my-3" {...props}>
+        <div className="space-y-1.5 my-3" {...props}>
           {children}
-        </ul>
+        </div>
       );
     },
     strong: ({ node, children, ...props }: any) => {

@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { and, desc, eq, inArray, like } from "drizzle-orm";
 import postgres from "postgres";
 import { genSaltSync, hashSync } from "bcrypt-ts";
-import { chat, chunk, user, fileAssociation, organization, membership, invite, orgFileAssociation, itemAssignment, userProfile } from "@/schema";
+import { chat, chunk, user, fileAssociation, organization, membership, invite, orgFileAssociation, itemAssignment, userProfile, fileMetadata as fileMetadataTable, extractedEntity as extractedEntityTable } from "@/schema";
 import { randomUUID } from "crypto";
 
 // Optionally, if not using email/pass login, you can
@@ -146,6 +146,26 @@ export async function deleteChunksByFilePath({
   filePath: string;
 }) {
   return await db.delete(chunk).where(eq(chunk.filePath, filePath));
+}
+
+// File metadata persistence
+export async function upsertFileMetadata({ orgId, filePath, filename, slug, section, currency, asOfDate, extractedEntities }: { orgId: string; filePath: string; filename: string; slug?: string; section?: string; currency?: string; asOfDate?: Date | null; extractedEntities?: any }) {
+  // Simple upsert: delete then insert to avoid duplicates
+  await db.delete(fileMetadataTable).where(and(eq(fileMetadataTable.orgId, orgId), eq(fileMetadataTable.filePath, filePath)));
+  await db.insert(fileMetadataTable).values({ orgId, filePath, filename, slug: slug as any, section: section as any, currency: currency as any, asOfDate: (asOfDate ?? null) as any, extractedEntities: extractedEntities ?? null as any });
+}
+
+export async function insertExtractedEntities({ orgId, filePath, entities }: { orgId: string; filePath: string; entities: Array<{ key: string; value: string; confidence?: number; unit?: string; asOfDate?: Date | null }> }) {
+  if (!entities || entities.length === 0) return;
+  await db.insert(extractedEntityTable).values(entities.map((e) => ({ orgId, filePath, key: e.key, value: e.value, confidence: (e.confidence ?? null) as any, unit: (e.unit ?? null) as any, asOfDate: (e.asOfDate ?? null) as any })));
+}
+
+export async function getFileMetadataForOrg({ orgId }: { orgId: string }) {
+  return await db.select().from(fileMetadataTable).where(eq(fileMetadataTable.orgId, orgId));
+}
+
+export async function getEntitiesForOrg({ orgId }: { orgId: string }) {
+  return await db.select().from(extractedEntityTable).where(eq(extractedEntityTable.orgId, orgId));
 }
 
 export async function getFileAssociationsByUser({

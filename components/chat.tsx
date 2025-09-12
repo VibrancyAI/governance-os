@@ -2,7 +2,7 @@
 
 import { Message } from "ai";
 import { useChat } from "ai/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Files } from "@/components/files";
 import { AnimatePresence, motion } from "framer-motion";
 import { FileIcon } from "@/components/icons";
@@ -12,6 +12,9 @@ import { useScrollToBottom } from "@/components/use-scroll-to-bottom";
 import { Session } from "next-auth";
 import useSWR from "swr";
 import { fetcher } from "@/utils/functions";
+// Inline action rows are rendered inside each assistant message via ActionMessage
+import { UploadModal } from "@/components/upload-modal";
+import { dataRoomStructure, slugify } from "@/components/data-room-structure";
 
 const suggestionsByPerspective: Record<string, { label: string; action: string }[]> = {
   founder: [
@@ -31,16 +34,23 @@ const suggestionsByPerspective: Record<string, { label: string; action: string }
   ],
 };
 
+function stripUiJsonBlocks(text: string): string {
+  if (!text) return text;
+  return text.replace(/```ui-json[\s\S]*?```/gi, "").replace(/```json[\s\S]*?```/gi, "").trim();
+}
+
 export function Chat({
   id,
   initialMessages,
   session,
   isWidget = false,
+  onMessagesChange,
 }: {
   id: string;
   initialMessages: Array<Message>;
   session: Session | null;
   isWidget?: boolean;
+  onMessagesChange?: (messages: Array<Message>) => void;
 }) {
   const [selectedFilePathnames, setSelectedFilePathnames] = useState<
     Array<string>
@@ -51,6 +61,17 @@ export function Chat({
     "founder" | "investor_diligence" | "acquirer_mna"
   >("founder");
   const [hasUserDeselected, setHasUserDeselected] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
+  const [chatUploadSlug, setChatUploadSlug] = useState<string | null>(null);
+
+  function slugToLabel(slug: string): string {
+    for (const section of dataRoomStructure) {
+      for (const d of section.documents) {
+        if (slugify(d) === slug) return d;
+      }
+    }
+    return slug.replace(/-/g, " ");
+  }
 
   useEffect(() => {
     if (isMounted !== false && session && session.user) {
@@ -129,30 +150,45 @@ export function Chat({
     },
   });
 
+  useEffect(() => {
+    if (onMessagesChange) onMessagesChange(messages);
+  }, [messages, onMessagesChange]);
+
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
 
+  const lastAssistantText = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return String(messages[i].content || "");
+    }
+    return undefined;
+  }, [messages]);
+
+  // If assistant didn't provide ui-json, synthesize next steps from uploaded/not uploaded items
+  // by reading /api/files/list and data room structure. This keeps action cards useful even with plain text.
+  // We compute a simple heuristic list here (client-side only, no extra DB calls).
+
   return (
-    <div className={`flex flex-row justify-center ${isWidget ? "pb-4 h-full" : "pb-24 h-dvh"} bg-gradient-to-br from-slate-50 via-white to-blue-50/30`}>
-      <div className={`flex flex-col justify-between items-center ${isWidget ? "w-full gap-3" : "gap-6"}`}>
-        {/* Perspective selector */}
-        <motion.div 
-          className={`w-full ${isWidget ? "max-w-[680px] px-3 pt-3" : "md:max-w-[600px] px-4 md:px-0 pt-6"}`}
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
+    <div className={`flex flex-col h-full ${isWidget ? "pb-4" : "pb-0"} bg-gradient-to-br from-slate-50 via-white to-blue-50/30`}>
+      {/* Header with perspective selector */}
+      <motion.div 
+        className={`flex-shrink-0 border-b border-slate-200/50 bg-white/70 backdrop-blur-sm ${isWidget ? "px-3 py-3" : "px-6 py-4"}`}
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4 }}
+      >
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100/80 backdrop-blur-sm border border-slate-200/60 p-1.5 shadow-sm">
             {[
-              { key: "founder", label: "Founder", color: " from-blue-500 to-blue-600" },
-              { key: "investor_diligence", label: "Investor", color: "from-emerald-500 to-emerald-600" },
-              { key: "acquirer_mna", label: "Acquirer", color: "from-purple-500 to-purple-600" },
+              { key: "founder", label: "Founder", color: "from-blue-500 to-blue-600", icon: "🚀" },
+              { key: "investor_diligence", label: "Investor", color: "from-emerald-500 to-emerald-600", icon: "💼" },
+              { key: "acquirer_mna", label: "Acquirer", color: "from-purple-500 to-purple-600", icon: "🏢" },
             ].map((p) => (
               <motion.button
                 key={p.key}
                 onClick={() => setPerspective(p.key as any)}
                 type="button"
-                className={`relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                className={`relative px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center gap-2 ${
                   perspective === p.key
                     ? `text-white shadow-md`
                     : "text-slate-600 hover:text-slate-800 hover:bg-white/50"
@@ -167,143 +203,201 @@ export function Chat({
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   />
                 )}
+                <span className="relative z-10 text-xs">{p.icon}</span>
                 <span className="relative z-10">{p.label}</span>
               </motion.button>
             ))}
           </div>
-        </motion.div>
-        <div
-          ref={messagesContainerRef}
-          className={`flex flex-col gap-2 h-full ${isWidget ? "w-full px-3" : "w-dvw px-4"} items-center overflow-y-scroll scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent`}
-        >
-          {messages.map((message, index) => (
-            <PreviewMessage
-              key={`${id}-${index}`}
-              role={message.role}
-              content={message.content}
-            />
-          ))}
-          <AnimatePresence>
-            {isLoading && <ThinkingIndicator />}
-          </AnimatePresence>
-          <div
-            ref={messagesEndRef}
-            className="flex-shrink-0 min-w-[24px] min-h-[24px]"
-          />
+          
+          <div />
+        </div>
+      </motion.div>
+
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Messages area */}
+        <div className="flex-1 flex justify-center overflow-hidden">
+          <div className={`w-full max-w-4xl flex flex-col ${isWidget ? "px-3" : "px-6"}`}>
+
+            <div
+              ref={messagesContainerRef}
+              className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent"
+            >
+              {messages.length === 0 && (
+                <motion.div 
+                  className="space-y-6 py-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.5 }}
+                >
+                  <motion.div
+                    className="text-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <h2 className="text-2xl font-bold text-slate-800 mb-3">
+                      AI Data Room Advisor
+                    </h2>
+                    <p className="text-slate-600 max-w-md mx-auto leading-relaxed">
+                      Get expert guidance on your data room readiness. I&apos;ll analyze your documents, identify gaps, and provide actionable recommendations.
+                    </p>
+                  </motion.div>
+                  
+                  <motion.div
+                    className="grid gap-3 max-w-2xl mx-auto"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.7, duration: 0.5 }}
+                  >
+                    <h3 className="text-sm font-semibold text-slate-700 text-center mb-2">
+                      Popular {perspective === "founder" ? "founder" : perspective === "investor_diligence" ? "investor" : "M&A"} questions
+                    </h3>
+                    {(suggestionsByPerspective[perspective] || []).map((suggestedAction, index) => (
+                      <motion.button
+                        key={index}
+                        onClick={() => append({ role: "user", content: suggestedAction.action })}
+                        className="text-left border border-slate-200 rounded-xl p-4 bg-white/60 hover:bg-white hover:shadow-md hover:border-blue-300 transition-all duration-200 group"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.8 + index * 0.1, duration: 0.3 }}
+                        whileHover={{ scale: 1.01, x: 4 }}
+                        whileTap={{ scale: 0.99 }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full mt-2.5 group-hover:bg-blue-500 transition-colors" />
+                          <div className="flex-1">
+                            <span className="font-medium text-slate-800 group-hover:text-blue-700 transition-colors block">
+                              {suggestedAction.label}
+                            </span>
+                            <p className="text-xs text-slate-500 mt-1.5 line-clamp-2">
+                              {suggestedAction.action.length > 80 
+                                ? suggestedAction.action.substring(0, 80) + "..." 
+                                : suggestedAction.action
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      </motion.button>
+                    ))}
+                  </motion.div>
+                </motion.div>
+              )}
+
+              {messages.map((message, index) => (
+                <motion.div
+                  key={`${id}-${index}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                >
+                  <PreviewMessage
+                    role={message.role}
+                    content={String(message.content || "")}
+                    showActions={message.role === "assistant" && (index !== messages.length - 1 || !isLoading)}
+                    onAction={(a: any) => {
+                      if (a?.type === "upload" && a?.slug) {
+                        setChatUploadSlug(a.slug);
+                      } else if (a?.type === "assign" && a?.slug) {
+                        setShowInsights(true);
+                      } else if (a?.type === "generate" && a?.slug) {
+                        append({ role: "user", content: `Generate a high-quality template for ${a.slug}.` });
+                      } else if (a?.type === "question" && a?.text) {
+                        append({ role: "user", content: a.text });
+                      }
+                    }}
+                  />
+                </motion.div>
+              ))}
+
+              <AnimatePresence>
+                {isLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <ThinkingIndicator />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div ref={messagesEndRef} className="h-4" />
+            </div>
+
+            {/* Action cards - shown with delay after response */}
+            {/* No separate ActionCards block. Actions render inline inside assistant messages. */}
+          </div>
         </div>
 
-        {messages.length === 0 && (
-          <motion.div 
-            className="grid grid-cols-1 gap-3 w-full px-4 md:px-0 mx-auto md:max-w-[600px]"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-          >
-            <motion.div
-              className="text-center mb-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-            >
-              <h3 className="text-lg font-semibold text-slate-800 mb-2">
-                Get started with these suggestions
-              </h3>
-              <p className="text-sm text-slate-500">
-                Ask anything about your data room or try one of these popular questions
-              </p>
-            </motion.div>
-            {(suggestionsByPerspective[perspective] || []).map((suggestedAction, index) => (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 + 0.1 * index, duration: 0.3 }}
-                key={index}
-              >
-                <motion.button
-                  onClick={async () => {
-                    append({
-                      role: "user",
-                      content: suggestedAction.action,
-                    });
-                  }}
-                  className="w-full text-left border border-slate-200 text-slate-700 rounded-xl p-4 text-sm bg-white/80 backdrop-blur-sm hover:bg-white hover:shadow-md hover:border-blue-300 transition-all duration-200 group"
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 group-hover:bg-blue-500 transition-colors" />
-                    <div>
-                      <span className="font-medium text-slate-800 group-hover:text-blue-700 transition-colors">
-                        {suggestedAction.label}
-                      </span>
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                        {suggestedAction.action.length > 80 
-                          ? suggestedAction.action.substring(0, 80) + "..." 
-                          : suggestedAction.action
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </motion.button>
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
+        {/* Insights panel removed as per request */}
 
-        <motion.form
-          className={`flex flex-row gap-3 relative items-center w-full ${isWidget ? "max-w-[680px] px-3" : "md:max-w-[600px] max-w-[calc(100dvw-32px)] px-4 md:px-0"}`}
-          onSubmit={handleSubmit}
+        {/* Input area */}
+        <motion.div
+          className={`border-t border-slate-200/50 bg-white/70 backdrop-blur-sm ${isWidget ? "p-3" : "p-6"}`}
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
         >
-          <div className="relative flex-1">
-            <motion.input
-              className="w-full bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl px-4 py-3 outline-none text-slate-800 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all placeholder:text-slate-400 shadow-sm hover:shadow-md focus:shadow-lg"
-              placeholder="Ask me anything about your data room..."
-              value={input}
-              onChange={(event) => {
-                setInput(event.target.value);
-              }}
-              whileFocus={{ scale: 1.01 }}
-              transition={{ duration: 0.2 }}
-            />
-            {input && (
-              <motion.button
-                type="submit"
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors shadow-sm"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Send
-              </motion.button>
-            )}
-          </div>
-
-          <motion.div
-            className="relative text-sm bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl size-12 flex-shrink-0 flex flex-row items-center justify-center cursor-pointer hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50/50 transition-all shadow-sm hover:shadow-md"
-            onClick={() => {
-              setIsFilesVisible(!isFilesVisible);
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <form
+            className="flex gap-3 items-end max-w-4xl mx-auto"
+            onSubmit={handleSubmit}
           >
-            <FileIcon />
-            {selectedFilePathnames?.length > 0 && (
-              <motion.div
-                className="absolute text-xs -top-1 -right-1 bg-blue-500 size-5 rounded-full flex flex-row justify-center items-center border-2 border-white text-white font-medium"
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5, type: "spring", stiffness: 500 }}
-              >
-                {selectedFilePathnames.length}
-              </motion.div>
-            )}
-          </motion.div>
-        </motion.form>
+            <div className="flex-1 relative">
+              <motion.input
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-12 text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all shadow-sm resize-none"
+                placeholder="Ask me anything about your data room..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                disabled={isLoading}
+                whileFocus={{ scale: 1.005 }}
+                transition={{ duration: 0.2 }}
+              />
+              
+              <AnimatePresence>
+                {input && !isLoading && (
+                  <motion.button
+                    type="submit"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Send
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              {isLoading && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+
+            <motion.button
+              type="button"
+              onClick={() => setIsFilesVisible(true)}
+              className="relative bg-white border border-slate-200 rounded-xl w-12 h-12 flex items-center justify-center text-slate-600 hover:text-blue-500 hover:border-blue-300 hover:bg-blue-50/50 transition-all shadow-sm"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <FileIcon />
+              {selectedFilePathnames?.length > 0 && (
+                <motion.div
+                  className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-medium border-2 border-white"
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500 }}
+                >
+                  {selectedFilePathnames.length}
+                </motion.div>
+              )}
+            </motion.button>
+          </form>
+        </motion.div>
       </div>
 
       <AnimatePresence>
@@ -329,6 +423,27 @@ export function Chat({
           />
         )}
       </AnimatePresence>
+
+      {/* Shared upload modal for chat-triggered actions (single instance) */}
+      {Boolean(chatUploadSlug) && (
+        <UploadModal
+          open={true}
+          targetLabel={slugToLabel(chatUploadSlug || "")}
+          onClose={() => setChatUploadSlug(null)}
+          onUploaded={async (fileName) => {
+            try {
+              await fetch("/api/files/associations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ labelSlug: chatUploadSlug, fileName }),
+              });
+            } finally {
+              setChatUploadSlug(null);
+            }
+          }}
+          onRefetch={() => { /* chat doesn't manage list state; no-op */ }}
+        />
+      )}
     </div>
   );
 }

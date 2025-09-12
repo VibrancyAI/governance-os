@@ -16,6 +16,8 @@ async function main() {
     "0005_org_file_association.sql",
     "0006_item_assignment.sql",
     "0007_org_logo_user_profile.sql",
+    "0008_item_assignment_many.sql",
+    "0009_file_metadata.sql",
   ];
   for (const f of files) {
     const fp = path.join(dir, f);

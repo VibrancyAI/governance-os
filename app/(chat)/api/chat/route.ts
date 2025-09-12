@@ -1,8 +1,9 @@
 import { customModel } from "@/ai";
 import { auth } from "@/app/(auth)/auth";
-import { createMessage } from "@/app/db";
+import { createMessage, getOrgFileAssociations, getFileMetadataForOrg } from "@/app/db";
 import { streamText } from "ai";
 import { getCurrentOrgIdOrSetDefault } from "@/app/api/orgs/_utils";
+import { buildAdvisorSystemPrompt } from "@/ai/prompt-builder";
 
 export async function POST(request: Request) {
   const { id, messages, selectedFilePathnames, perspective } = await request.json();
@@ -13,42 +14,36 @@ export async function POST(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const perspectiveSystem = (() => {
-    switch (perspective) {
-      case "founder":
-        return `You are an AI operating as a startup founder preparing an investor-ready data room.
-Objectives:
-- Identify missing or weak artifacts and propose concrete additions (templates/checklists acceptable)
-- Elevate narrative: problem, solution, market (bottom-up), traction, unit economics, retention, milestones
-- Clarify risks and mitigations, GTM, hiring plan, roadmap, capital plan and use of proceeds
-Output style:
-- Executive, concise, bullet-first. Sections: Summary, Gaps/Missing, Recommendations, Risks, Open Questions.`;
-      case "investor_diligence":
-        return `You are an investor performing venture due diligence.
-Objectives:
-- Audit the data room for completeness; list missing materials and diligence gaps
-- Analyze market, competition, differentiation, moat, traction, unit economics, cohorts/retention, sales efficiency
-- Surface red flags, key assumptions to test, and questions for founders; note valuation considerations
-Output style:
-- Analytical, evidence-backed bullets. Sections: Summary, Missing Items, Findings, Risks, Questions.`;
-      case "acquirer_mna":
-        return `You are a corporate development lead evaluating an acquisition.
-Objectives:
-- Audit readiness: list missing/weak M&A materials (contracts, IP, compliance, HR, security, financials)
-- Assess strategic fit/synergies, integration risks, revenue quality, churn, key customer concentration
-- Suggest deal structure considerations and integration priorities
-Output style:
-- Pragmatic, risk-aware bullets. Sections: Summary, Missing Items, Synergies/Fit, Risks, Integration Notes.`;
-      default:
-        return `You are a helpful assistant for data room analysis.`;
-    }
-  })();
-
   const orgId = await getCurrentOrgIdOrSetDefault(session.user!.email!);
+
+  // Compute coverage from org file associations, file metadata slugs, and selected files
+  const assoc = await getOrgFileAssociations({ orgId });
+  const presentSlugs = new Set<string>();
+  for (const row of assoc) {
+    if (row.labelSlug) presentSlugs.add(row.labelSlug);
+  }
+  // include detected slugs from uploaded files (metadata extractor)
+  try {
+    const metas = await getFileMetadataForOrg({ orgId });
+    for (const m of metas || []) {
+      const s = (m as any).slug as string | null;
+      if (s) presentSlugs.add(s);
+    }
+  } catch {}
+  // also include normalized file pathnames (best-effort; they may not match slugs exactly)
+  for (const path of selectedFilePathnames || []) {
+    const normalized = path
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
+    presentSlugs.add(normalized);
+  }
+
+  const { prompt: systemPrompt } = buildAdvisorSystemPrompt({ perspective, coverage: { presentSlugs }, orgId });
 
   const result = streamText({
     model: customModel,
-    system: perspectiveSystem,
+    system: systemPrompt,
     messages,
     temperature: 1,
     toolChoice: "none",
@@ -60,6 +55,7 @@ Output style:
           missing: selectedFilePathnames.length === 0 ? "all" : "partial",
         },
         orgId,
+        presentSlugs: Array.from(presentSlugs),
       },
     },
     onFinish: async ({ text }) => {

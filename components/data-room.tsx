@@ -104,13 +104,27 @@ export function DataRoom() {
       .replace(/(^-|-$)+/g, "");
   }
 
+  function synonyms(normalizedLabel: string): string[] {
+    const list = [normalizedLabel];
+    if (normalizedLabel.includes("product-roadmap")) list.push("roadmap", "prd", "product-requirements", "product-requirements-doc", "product-requirements-document");
+    if (normalizedLabel.includes("cap-table")) list.push("captable", "cap-table-history");
+    return list;
+  }
+
   function findMatchingFileName(doc: string): string | undefined {
     const normDoc = normalize(doc);
     // 1) explicit association
     const assoc = associations[normDoc];
     if (assoc && uploadedSet.has(assoc)) return assoc;
     // 2) fuzzy contains
-    return files?.find((f) => normalize(f.pathname).includes(normDoc))?.pathname;
+    const fuzzy = files?.find((f) => normalize(f.pathname).includes(normDoc))?.pathname;
+    if (fuzzy) return fuzzy;
+    // 3) synonyms
+    const syns = synonyms(normDoc);
+    return files?.find((f) => {
+      const nf = normalize(f.pathname);
+      return syns.some((s) => nf.includes(s));
+    })?.pathname;
   }
 
   function isDocUploaded(doc: string): boolean {
@@ -446,7 +460,7 @@ function OverallProgress({
   );
 }
 
-function DataRoomItem({
+export function DataRoomItem({
   label,
   isUploaded,
   uploadKey,

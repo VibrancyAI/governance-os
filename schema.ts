@@ -72,8 +72,33 @@ export const chat = pgTable("Chat", {
 export const chunk = pgTable("Chunk", {
   id: text("id").primaryKey().notNull(),
   filePath: text("filePath").notNull(),
+  section: text("section"),
+  slug: text("slug"),
+  sourceUrl: text("sourceUrl"),
+  asOfDate: timestamp("asOfDate"),
   content: text("content").notNull(),
   embedding: real("embedding").array().notNull(),
+});
+
+export const fileMetadata = pgTable("FileMetadata", {
+  orgId: text("orgId").notNull().references(() => organization.id),
+  filePath: text("filePath").notNull(),
+  filename: text("filename").notNull(),
+  slug: text("slug"),
+  section: text("section"),
+  currency: text("currency"),
+  asOfDate: timestamp("asOfDate"),
+  extractedEntities: json("extractedEntities"),
+});
+
+export const extractedEntity = pgTable("ExtractedEntity", {
+  orgId: text("orgId").notNull().references(() => organization.id),
+  filePath: text("filePath").notNull(),
+  key: text("key").notNull(),
+  value: text("value").notNull(),
+  confidence: real("confidence"),
+  unit: text("unit"),
+  asOfDate: timestamp("asOfDate"),
 });
 
 export const orgFileAssociation = pgTable(
